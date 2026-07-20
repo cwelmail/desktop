@@ -1,0 +1,511 @@
+"use client"
+
+import { useCallback, useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
+import { motion, AnimatePresence, LayoutGroup } from "motion/react"
+import { Icon } from "@/components/icon"
+import {
+  listAliases,
+  listMessages,
+  burnAlias,
+  markMessagesRead,
+  patchMessage,
+  deleteMessage,
+  blockSender,
+  bulkUpdateMessages,
+  getAccountSettings,
+  getMe,
+  getBillingStatus,
+  emptyTrash,
+  isAuthError,
+} from "@/lib/api"
+import { canBlacklistOnAlias, canSendFromAlias, sendableAliases } from "@/lib/alias-permissions"
+import { BRAND_NAME } from "@/lib/brand"
+import { canSendHtml as planCanSendHtml, canUseSecureLink as planCanUseSecureLink, hasProBenefits } from "@/lib/plan-access"
+import { useRealtime } from "@/lib/use-realtime"
+import type { Message as ApiMessage } from "@/lib/types/api"
+import { senderDisplayName, senderColor, type DemoAlias, type DemoMessage, type InboxView, type ListDensity, type MessageKind } from "@/lib/demo-inbox"
+import { formatMessageListTime, formatWhen } from "@/lib/format-time"
+import { FREE_ALIAS_LIMIT } from "@/lib/plans"
+
+import { cn } from "@/lib/utils"
+import { MessageBody } from "@/components/message-body"
+import { ComposePanel, type ReplyContext } from "@/components/compose-modal"
+import { SendToastHost } from "@/components/send-toast"
+import { UpgradeModal } from "@/components/upgrade-modal"
+import { ConfirmModal } from "@/components/confirm-modal"
+import { Checkbox } from "@/components/ui/checkbox"
+import { KeyboardShortcutsOverlay } from "@/components/keyboard-shortcuts-overlay"
+
+function toDemoMessage(message: ApiMessage): DemoMessage {
+  return {
+    id: message.id, from: message.from, senderName: message.sender_name, envelopeSender: message.envelope_sender,
+    to: message.to, subject: message.subject, preview: message.preview, body: message.body, bodyHtml: message.body_html,
+    receivedAt: message.received_at, unread: message.unread, alias: message.alias, kind: message.kind as MessageKind,
+    starred: message.starred, direction: message.direction, deliveryStatus: message.delivery_status,
+    deleted: message.deleted, hasAttachments: message.has_attachments, messageIdHeader: message.message_id_header,
+    referencesHeader: message.references_header,
+    attachments: message.attachments?.map((a) => ({ id: a.id, filename: a.filename, contentType: a.content_type, size: a.size })),
+  }
+}
+
+function buildReplyContext(message: DemoMessage): ReplyContext {
+  const mid = message.messageIdHeader || `<${message.id}@aeri.rest>`
+  const refs = message.referencesHeader ? `${message.referencesHeader} ${mid}` : mid
+  return { to: message.from, subject: message.subject, inReplyTo: mid, references: refs.trim(), fromAlias: message.alias, mode: "reply" }
+}
+
+function buildForwardContext(message: DemoMessage): ReplyContext {
+  const quoted = ["", "---------- Forwarded message ----------", `From: ${message.from}`, `Subject: ${message.subject}`, "", message.body].join("\n")
+  return { to: "", subject: message.subject, inReplyTo: message.messageIdHeader || "", references: message.referencesHeader || "", fromAlias: message.alias, forwardBody: quoted, mode: "forward" }
+}
+
+const ease = [0.32, 0.72, 0, 1] as const
+const morph = { layout: { duration: 0.38, ease }, duration: 0.32, ease } as const
+
+const VIEWS: { id: InboxView; label: string; icon: string }[] = [
+  { id: "inbox", label: "Inbox", icon: "ph:tray" },
+  { id: "sent", label: "Sent", icon: "ph:paper-plane-tilt" },
+  { id: "starred", label: "Starred", icon: "ph:star" },
+  { id: "archive", label: "Archive", icon: "ph:archive" },
+  { id: "trash", label: "Trash", icon: "ph:trash" },
+]
+
+type InboxProps = { primaryAlias: string; domain: string }
+
+function SenderAvatar({ message }: { message: DemoMessage }) {
+  const color = senderColor(message.from)
+  const initial = senderDisplayName(message.from, message.senderName).charAt(0).toUpperCase()
+  return <span className={`flex size-8 shrink-0 items-center justify-center rounded-full ${color} font-mono text-[11px] font-medium text-white`}>{initial}</span>
+}
+
+function handleAuthFailure(router: ReturnType<typeof useRouter>) { router.replace("/sign-in") }
+
+export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
+  const router = useRouter()
+  const [aliases, setAliases] = useState<DemoAlias[]>([])
+  const [messages, setMessages] = useState<DemoMessage[]>([])
+  const [view, setView] = useState<InboxView>("inbox")
+  const [selectedAlias, setSelectedAlias] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [aliasLoading, setAliasLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [composeOpen, setComposeOpen] = useState(false)
+  const [replyTo, setReplyTo] = useState<ReplyContext | null>(null)
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
+  const [canSend, setCanSend] = useState(false)
+  const [canSendHtml, setCanSendHtml] = useState(false)
+  const [canUseSecureLink, setCanUseSecureLink] = useState(false)
+  const [canBlockSenders, setCanBlockSenders] = useState(false)
+  const [maxAliases, setMaxAliases] = useState<number | null>(FREE_ALIAS_LIMIT)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [filterUnread, setFilterUnread] = useState(false)
+  const [filterAttachments, setFilterAttachments] = useState(false)
+  const [listDensity, setListDensity] = useState<ListDensity>("comfortable")
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [burnAliasTarget, setBurnAliasTarget] = useState<DemoAlias | null>(null)
+  const [burningAliasId, setBurningAliasId] = useState<string | null>(null)
+  const [accountEmail, setAccountEmail] = useState("")
+  const [plan, setPlan] = useState("free")
+  const [aliasDropdownOpen, setAliasDropdownOpen] = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const messagesLoadEpochRef = useRef(0)
+  const aliasDropdownRef = useRef<HTMLDivElement>(null)
+
+  const loadAliases = useCallback(async () => {
+    const data = await listAliases()
+    const mapped = (data.aliases ?? []).map((alias) => ({
+      id: alias.id, handle: alias.handle, label: alias.label, icon: alias.icon,
+      unread: alias.unread, expiresAt: alias.expires_at, shared: alias.shared,
+      isOwner: alias.is_owner ?? true, permissions: alias.permissions ?? [],
+    }))
+    setAliases(mapped)
+    if (mapped.length > 0) setSelectedAlias((cur) => cur && mapped.some((a) => a.handle === cur) ? cur : mapped[0].handle)
+  }, [])
+
+  const loadMessages = useCallback(async () => {
+    const epoch = ++messagesLoadEpochRef.current
+    const data = await listMessages({ view, alias: selectedAlias || undefined, search: search.trim() || undefined, unread: filterUnread || undefined, has_attachment: filterAttachments || undefined })
+    if (epoch !== messagesLoadEpochRef.current) return
+    setMessages(data.messages.map(toDemoMessage))
+  }, [view, selectedAlias, search, filterUnread, filterAttachments])
+
+  const refreshInbox = useCallback(async () => {
+    setRefreshing(true)
+    try { await Promise.all([loadAliases(), loadMessages()]) }
+    catch (err) { if (isAuthError(err)) handleAuthFailure(router) }
+    finally { setRefreshing(false) }
+  }, [loadAliases, loadMessages, router])
+
+  const refreshCanSend = useCallback(async () => {
+    try { const account = await getMe(); setCanSend(account.can_send); setAccountEmail(account.email || ""); return account.can_send }
+    catch { setCanSend(false); return false }
+  }, [])
+
+  const refreshBilling = useCallback(async () => {
+    try {
+      const billing = await getBillingStatus()
+      const paid = hasProBenefits(billing)
+      setCanBlockSenders(billing.can_block_senders ?? paid)
+      setCanSendHtml(planCanSendHtml(billing))
+      setCanUseSecureLink(planCanUseSecureLink(billing))
+      setMaxAliases(billing.max_aliases ?? (paid ? null : FREE_ALIAS_LIMIT))
+      setPlan(billing.plan || "free")
+    } catch { setCanBlockSenders(false); setCanSendHtml(false); setCanUseSecureLink(false); setMaxAliases(FREE_ALIAS_LIMIT) }
+  }, [])
+
+  const refreshInboxQuiet = useCallback(() => {
+    void loadMessages().catch((err) => { if (isAuthError(err)) handleAuthFailure(router) })
+    void loadAliases().catch((err) => { if (isAuthError(err)) handleAuthFailure(router) })
+  }, [loadAliases, loadMessages, router])
+
+  const { reconnecting: realtimeReconnecting } = useRealtime({
+    onInboxChanged: refreshInboxQuiet,
+    onAliasesChanged: () => { void loadAliases().catch(() => {}) },
+    onBillingChanged: () => { void refreshBilling(); void refreshCanSend() },
+  })
+
+  useEffect(() => { void refreshCanSend(); void refreshBilling() }, [refreshCanSend, refreshBilling])
+  useEffect(() => { getAccountSettings().then((s) => { setListDensity(s.list_density) }).catch(() => {}) }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    setAliasLoading(true)
+    loadAliases().catch((err) => { if (!cancelled) { if (isAuthError(err)) { handleAuthFailure(router); return } } }).finally(() => { if (!cancelled) setAliasLoading(false) })
+    return () => { cancelled = true }
+  }, [loadAliases, router])
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true); setError(null)
+    loadMessages().catch((err) => { if (!cancelled) { if (isAuthError(err)) { handleAuthFailure(router); return }; setError("Could not load messages.") } }).finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [loadMessages, router])
+
+  const selected = messages.find((m) => m.id === selectedId) ?? null
+  const totalUnread = aliases.reduce((sum, a) => sum + a.unread, 0)
+  const activeAliasMeta = aliases.find((a) => a.handle === selectedAlias) ?? aliases[0] ?? null
+  const effectiveCanSend = activeAliasMeta ? canSendFromAlias(activeAliasMeta, canSend) : canSend
+  const sendableFrom = sendableAliases(aliases, canSend).map((a) => a.handle)
+  const activeAliasLabel = selectedAlias ?? `${primaryAlias}@${domain}`
+
+  const showUpgrade = useCallback(() => { setComposeOpen(false); setUpgradeOpen(true) }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    document.title = totalUnread > 0 ? `(${totalUnread}) ${BRAND_NAME}` : BRAND_NAME
+    if (window.electronAPI) {
+      window.electronAPI.updateTray({
+        totalUnread,
+        recentMessages: messages.filter((m) => m.unread).slice(0, 6).map((m) => ({
+          from: senderDisplayName(m.from, m.senderName), subject: m.subject,
+        })),
+        aliases: aliases.map((a) => ({ handle: a.handle, unread: a.unread })),
+        accountEmail,
+        plan,
+      })
+    }
+  }, [totalUnread, messages, aliases, accountEmail, plan])
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (aliasDropdownRef.current && !aliasDropdownRef.current.contains(e.target as Node)) setAliasDropdownOpen(false)
+    }
+    document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.electronAPI) return
+    window.electronAPI.onNavigate((p) => { if (p === "/inbox") router.replace("/inbox") })
+    window.electronAPI.onCompose?.(() => { void refreshCanSend().then(() => { setReplyTo(null); setSelectedId(null); setComposeOpen(true) }) })
+    window.electronAPI.onFocusSearch?.(() => searchRef.current?.focus())
+    window.electronAPI.onSelectAlias?.((handle) => { setSelectedAlias(handle); setView("inbox"); setSelectedId(null) })
+  }, [router, refreshCanSend])
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null
+      const typing = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable
+      if (typing || composeOpen) return
+      if (event.key === "?") { event.preventDefault(); setShortcutsOpen(true); return }
+      if (event.key === "/") { event.preventDefault(); searchRef.current?.focus(); return }
+      const active = messages.find((m) => m.id === selectedId)
+      if (!active) return
+      if (event.key === "j" || event.key === "k") {
+        event.preventDefault()
+        const i = messages.findIndex((m) => m.id === active.id)
+        const next = messages[event.key === "j" ? i + 1 : i - 1]
+        if (next) void openMessage(next)
+        return
+      }
+      if (event.key === "r") { event.preventDefault(); setReplyTo(buildReplyContext(active)); setComposeOpen(true); return }
+      if (event.key === "e" && view !== "trash") { event.preventDefault(); void archiveMessage(active.id) }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [composeOpen, messages, selectedId, view])
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
+  }
+
+  async function openMessage(message: DemoMessage) {
+    setComposeOpen(false); setReplyTo(null); setSelectedId(message.id)
+    if (!message.unread) return
+    try { const updated = await patchMessage(message.id, { read: true }); setMessages((prev) => prev.map((m) => m.id === updated.id ? toDemoMessage(updated) : m)); void loadAliases() } catch {}
+  }
+
+  async function toggleStar(id: string) {
+    const current = messages.find((m) => m.id === id)
+    if (!current) return
+    try { const updated = await patchMessage(id, { starred: !current.starred }); setMessages((prev) => prev.map((m) => m.id === updated.id ? toDemoMessage(updated) : m)) } catch {}
+  }
+
+  async function archiveMessage(id: string) {
+    try { await patchMessage(id, { archived: true }); setMessages((prev) => prev.filter((m) => m.id !== id)); if (selectedId === id) setSelectedId(null); void loadAliases() } catch {}
+  }
+
+  async function deleteSelectedMessage(id: string) {
+    setActionError(null)
+    try { await deleteMessage(id); setMessages((prev) => prev.filter((m) => m.id !== id)); if (selectedId === id) setSelectedId(null); void loadAliases() } catch { setActionError("Could not delete message.") }
+  }
+
+  async function blockSelectedSender(from: string) {
+    if (!canBlockSenders) { setActionError("Blocking requires Pro."); showUpgrade(); return }
+    setActionError(null)
+    try { await blockSender(from, { fromAlias: selectedAlias ?? undefined }); setMessages((prev) => prev.filter((m) => m.from !== from)); if (selected?.from === from) setSelectedId(null); void loadAliases() } catch { setActionError("Could not block sender.") }
+  }
+
+  async function markAllRead() {
+    if (!selectedAlias) return
+    try { await markMessagesRead({ alias: selectedAlias }); setMessages((prev) => prev.map((m) => ({ ...m, unread: false }))); void loadAliases() } catch {}
+  }
+
+  if ((loading || aliasLoading) && messages.length === 0 && aliases.length === 0) {
+    return <div className="flex flex-1 items-center justify-center"><div className="size-5 animate-spin rounded-full border-2 border-accent border-t-transparent" /></div>
+  }
+
+  if (error && messages.length === 0) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
+        <p className="text-sm text-muted-foreground">{error}</p>
+        <button type="button" onClick={() => { setLoading(true); setError(null); void Promise.all([loadAliases(), loadMessages()]).finally(() => setLoading(false)) }} className="text-sm text-accent hover:underline">Retry</button>
+      </div>
+    )
+  }
+
+  return (
+    <LayoutGroup id="desktop-inbox">
+      <div className="flex min-h-0 w-full flex-1 flex-col">
+
+        {/* ── Header bar: alias dropdown + tabs + search + compose ── */}
+        <header className="flex shrink-0 items-center gap-2 border-b border-border/50 pl-[72px] pr-3">
+          <div ref={aliasDropdownRef} className="relative shrink-0">
+            <button type="button" onClick={() => setAliasDropdownOpen(!aliasDropdownOpen)} className="flex items-center gap-1.5 rounded-lg px-2 py-2 text-[12px] transition-colors hover:bg-secondary/50">
+              <span className="font-mono text-muted-foreground">{activeAliasLabel}</span>
+              <Icon icon={aliasDropdownOpen ? "ph:caret-up" : "ph:caret-down"} className="size-3 text-muted-foreground/60" />
+            </button>
+            <AnimatePresence>
+              {aliasDropdownOpen && (
+                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.12 }} className="absolute left-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-xl border border-border/60 bg-popover shadow-xl shadow-black/20">
+                  <div className="border-b border-border/40 px-3 py-2"><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Aliases</p></div>
+                  <div className="max-h-64 overflow-y-auto p-1">
+                    {aliases.map((alias) => {
+                      const active = alias.handle === selectedAlias
+                      const local = alias.handle.split("@")[0]
+                      return (
+                        <button key={alias.id} type="button" onClick={() => { setSelectedAlias(alias.handle); setSelectedId(null); setAliasDropdownOpen(false); if (view === "archive" && alias.unread === 0) setView("inbox") }}
+                          className={cn("flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12px] transition-colors", active ? "bg-secondary/60 text-foreground" : "text-muted-foreground hover:bg-secondary/30 hover:text-foreground")}>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className="truncate font-mono text-[11px]">{local}</span>
+                            {alias.shared && <span className="shrink-0 rounded-full border border-accent/25 bg-accent/10 px-1.5 py-px text-[8px] uppercase tracking-wide text-accent">Shared</span>}
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            {alias.unread > 0 && <span className="font-mono text-[10px] text-accent">{alias.unread}</span>}
+                            {active && <Icon icon="ph:check" className="size-3 text-accent" />}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <nav className="flex items-center gap-0.5">
+            {VIEWS.map((v) => (
+              <button key={v.id} type="button" onClick={() => { setView(v.id); setSelectedId(null) }}
+                className={cn("relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] transition-colors", view === v.id ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
+                {view === v.id && <motion.span layoutId="desktop-view-tab" transition={morph} className="absolute inset-0 rounded-lg bg-secondary/50" />}
+                <Icon icon={v.icon} className="relative size-3.5" />
+                <span className="relative hidden sm:inline">{v.label}</span>
+              </button>
+            ))}
+          </nav>
+
+          <div className="flex-1" />
+
+          <label className="relative flex min-w-0 items-center gap-2 rounded-full border border-border/60 bg-background/50 px-3 py-1.5 focus-within:border-accent/30">
+            <Icon icon="ph:magnifying-glass" className="size-3.5 shrink-0 text-muted-foreground" />
+            <input ref={searchRef} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search" className="w-28 bg-transparent text-[12px] outline-none placeholder:text-muted-foreground/50 sm:w-40" />
+            {search && <button type="button" onClick={() => setSearch("")} className="text-muted-foreground hover:text-foreground"><Icon icon="ph:x" className="size-3" /></button>}
+          </label>
+
+          <button type="button" onClick={() => { void refreshCanSend().then(() => { setReplyTo(null); setSelectedId(null); setComposeOpen(true) }) }} disabled={sendableFrom.length === 0}
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-accent/30 bg-accent/[0.1] px-3 py-1.5 text-[12px] font-medium text-accent transition-colors hover:bg-accent/[0.16] disabled:cursor-not-allowed disabled:opacity-40">
+            <Icon icon="ph:pencil-simple-line" className="size-3.5" />
+            <span className="hidden sm:inline">Compose</span>
+          </button>
+
+          <button type="button" onClick={() => void refreshInbox()} disabled={refreshing} className="shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50" title="Refresh">
+            <Icon icon="ph:arrow-clockwise" className={cn("size-3.5", refreshing && "animate-spin")} />
+          </button>
+        </header>
+
+        {/* ── Toolbar: filters + alias info + bulk actions ── */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-border/30 px-4 py-2">
+          <button type="button" onClick={() => setFilterUnread((c) => !c)} className={cn("rounded-full border px-2.5 py-0.5 text-[10px]", filterUnread ? "border-accent/40 bg-accent/10 text-accent" : "border-border/60 text-muted-foreground")}>Unread</button>
+          <button type="button" onClick={() => setFilterAttachments((c) => !c)} className={cn("rounded-full border px-2.5 py-0.5 text-[10px]", filterAttachments ? "border-accent/40 bg-accent/10 text-accent" : "border-border/60 text-muted-foreground")}>Attachments</button>
+          <div className="flex-1" />
+          {view === "inbox" && <button type="button" onClick={() => void markAllRead()} className="text-[10px] text-muted-foreground transition-colors hover:text-foreground">Mark all read</button>}
+          {view === "trash" && messages.length > 0 && <button type="button" onClick={async () => { try { await emptyTrash(); setMessages([]); setSelectedId(null); void loadAliases() } catch {} }} className="text-[10px] text-destructive transition-colors hover:text-destructive">Empty trash</button>}
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-muted-foreground">{selectedIds.size} selected</span>
+              <button type="button" onClick={async () => { const ids = [...selectedIds]; try { await bulkUpdateMessages({ message_ids: ids, read: true }); setSelectedIds(new Set()); void loadMessages(); void loadAliases() } catch {} }} className="text-[10px] text-muted-foreground hover:text-foreground">Mark read</button>
+              <button type="button" onClick={async () => { const ids = [...selectedIds]; try { await bulkUpdateMessages({ message_ids: ids, starred: true }); setSelectedIds(new Set()); void loadMessages(); void loadAliases() } catch {} }} className="text-[10px] text-muted-foreground hover:text-foreground">Star</button>
+              {view === "trash" ? <button type="button" onClick={async () => { const ids = [...selectedIds]; try { await bulkUpdateMessages({ message_ids: ids, restore: true }); setSelectedIds(new Set()); void loadMessages(); void loadAliases() } catch {} }} className="text-[10px] text-muted-foreground hover:text-foreground">Restore</button> : <button type="button" onClick={async () => { const ids = [...selectedIds]; try { await bulkUpdateMessages({ message_ids: ids, archived: true }); setSelectedIds(new Set()); void loadMessages(); void loadAliases() } catch {} }} className="text-[10px] text-muted-foreground hover:text-foreground">Archive</button>}
+              <button type="button" onClick={async () => { const ids = [...selectedIds]; try { await bulkUpdateMessages({ message_ids: ids, delete: true }); setSelectedIds(new Set()); void loadMessages(); void loadAliases() } catch {} }} className="text-[10px] text-destructive hover:text-destructive">Delete</button>
+            </div>
+          )}
+        </div>
+
+        {actionError && <p className="border-b border-border/40 px-4 py-2 text-[11px] text-destructive" role="alert">{actionError}</p>}
+
+        {/* ── Main: message list + detail panel ── */}
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <ul className={cn("min-h-0 shrink-0 overflow-y-auto border-r border-border/40 transition-all duration-300", selected || composeOpen ? "w-[min(22rem,35%)]" : "w-full")}>
+            {messages.length === 0 ? (
+              <li className="flex flex-col items-center justify-center gap-2 px-6 py-20 text-center">
+                <Icon icon="ph:tray" className="size-5 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">{search ? "No matches" : "Nothing here"}</p>
+              </li>
+            ) : messages.map((message) => {
+              const unread = message.unread
+              const active = selectedId === message.id
+              const starred = Boolean(message.starred)
+              return (
+                <li key={message.id} className="group border-b border-border/30 last:border-b-0">
+                  <div className={cn("flex w-full items-start gap-2 px-2 text-left transition-colors", active ? "bg-secondary/40" : "hover:bg-secondary/20", listDensity === "compact" ? "py-2" : "py-3")}>
+                    <Checkbox checked={selectedIds.has(message.id)} onCheckedChange={() => toggleSelected(message.id)} className={cn("mt-2.5 opacity-0 transition-opacity group-hover:opacity-100", (selectedIds.has(message.id) || selectedIds.size > 0) && "opacity-100")} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} />
+                    <button type="button" onClick={() => openMessage(message)} className="flex min-w-0 flex-1 gap-3 pr-2 text-left">
+                      <SenderAvatar message={message} />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-baseline justify-between gap-2">
+                          <span className={cn("truncate text-[13px]", unread ? "font-medium text-foreground" : "text-muted-foreground")}>
+                            {message.direction === "sent" ? `To: ${message.to ?? message.from}` : senderDisplayName(message.from, message.senderName)}
+                          </span>
+                          <span className="flex shrink-0 items-center gap-1.5">
+                            {starred && <Icon icon="ph:star-fill" className="size-2.5 text-accent" />}
+                            <span className="text-[10px] tabular-nums text-muted-foreground">{formatMessageListTime(message.receivedAt)}</span>
+                          </span>
+                        </span>
+                        <span className={cn("mt-0.5 block truncate text-[13px]", unread ? "text-foreground" : "text-muted-foreground/90")}>{message.subject}</span>
+                        <span className="mt-0.5 flex items-center gap-2">
+                          {message.deliveryStatus === "pending" && <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-px text-[9px] uppercase text-amber-600">Pending</span>}
+                          {message.deliveryStatus === "failed" && <span className="rounded-full border border-destructive/30 bg-destructive/10 px-1.5 py-px text-[9px] uppercase text-destructive">Failed</span>}
+                          {message.hasAttachments && <Icon icon="ph:paperclip" className="size-2.5 text-muted-foreground/50" />}
+                          <span className="block truncate text-[11px] text-muted-foreground/70">{message.preview}</span>
+                        </span>
+                      </span>
+                    </button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+
+          <div className="hidden min-h-0 min-w-0 flex-1 md:flex md:flex-col">
+            <AnimatePresence mode="wait">
+              {composeOpen ? (
+                <motion.div key="compose" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }} transition={{ duration: 0.22, ease }} className="flex min-h-0 flex-1 flex-col">
+                  <ComposePanel fromAddresses={sendableFrom} defaultFrom={selectedAlias ?? undefined} replyTo={replyTo} canSend={effectiveCanSend} canSendHtml={canSendHtml} canUseSecureLink={canUseSecureLink}
+                    onClose={() => { setComposeOpen(false); setReplyTo(null) }} onUpgrade={showUpgrade}
+                    onSent={(fromAlias) => { setCanSend(true); setComposeOpen(false); setReplyTo(null); setSelectedId(null); if (fromAlias) setSelectedAlias(fromAlias); setView("sent"); window.setTimeout(() => { void loadMessages().catch(() => {}) }, 4000) }} />
+                </motion.div>
+              ) : selected ? (
+                <motion.article key={selected.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease }} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+                  <div className="flex items-center gap-1 border-b border-border/40 px-4 py-2">
+                    <button type="button" title="Star" onClick={() => toggleStar(selected.id)} className={cn("inline-flex size-7 items-center justify-center rounded-full transition-colors", selected.starred ? "text-accent" : "text-muted-foreground hover:text-foreground")}><Icon icon={selected.starred ? "ph:star-fill" : "ph:star"} className="size-4" /></button>
+                    <button type="button" title="Archive" onClick={() => void archiveMessage(selected.id)} className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"><Icon icon="ph:archive" className="size-4" /></button>
+                    <button type="button" title="Delete" onClick={() => void deleteSelectedMessage(selected.id)} className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-destructive"><Icon icon="ph:trash" className="size-4" /></button>
+                    <div className="mx-0.5 h-3 w-px bg-border/40" />
+                    <button type="button" title="Reply" onClick={() => { setReplyTo(buildReplyContext(selected)); setComposeOpen(true) }} disabled={!effectiveCanSend} className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"><Icon icon="ph:arrow-bend-up-left" className="size-4" /></button>
+                    <button type="button" title="Forward" onClick={() => { setReplyTo(buildForwardContext(selected)); setComposeOpen(true) }} disabled={!effectiveCanSend} className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"><Icon icon="ph:arrow-bend-down-right" className="size-4" /></button>
+                    <div className="flex-1" />
+                    <button type="button" title="Block sender" onClick={() => void blockSelectedSender(selected.from)} className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"><Icon icon="ph:prohibit" className="size-4" /></button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto px-5 py-4">
+                    <div className="flex items-start gap-3">
+                      <SenderAvatar message={selected} />
+                      <div className="min-w-0 flex-1">
+                        <h2 className="text-[15px] font-medium tracking-tight">{selected.subject}</h2>
+                        <p className="mt-1 text-[12px] text-muted-foreground">
+                          {senderDisplayName(selected.from, selected.senderName)} &lt;{selected.from}&gt;
+                          {selected.alias && <span className="ml-2 text-muted-foreground/60">to {selected.alias}</span>}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground/60">{formatWhen(selected.receivedAt)}</p>
+                      </div>
+                    </div>
+                    <MessageBody body={selected.body} bodyHtml={selected.bodyHtml} className="mt-4" />
+                    {selected.attachments && selected.attachments.length > 0 && (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {selected.attachments.map((att) => (
+                          <a key={att.id} href={`https://api.aeri.rest/api/v1/messages/${selected.id}/attachments/${att.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/60 px-3 py-1.5 text-[11px] text-muted-foreground transition-colors hover:border-accent/30 hover:text-foreground">
+                            <Icon icon="ph:paperclip" className="size-3" /> <span className="font-mono">{att.filename}</span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </motion.article>
+              ) : (
+                <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-1 items-center justify-center text-sm text-muted-foreground/60">Select a message</motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* ── Status bar ── */}
+        <footer className="flex shrink-0 items-center gap-3 border-t border-border/50 px-4 py-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className={cn("size-1.5 rounded-full", realtimeReconnecting ? "bg-amber-500" : "bg-green-500")} />
+            <span className="text-[10px] text-muted-foreground">{realtimeReconnecting ? "Reconnecting…" : "Connected"}</span>
+          </div>
+          <div className="h-2.5 w-px bg-border/40" />
+          <span className="text-[10px] text-muted-foreground">{aliases.length} alias{aliases.length !== 1 ? "es" : ""}</span>
+          {totalUnread > 0 && <><div className="h-2.5 w-px bg-border/40" /><span className="text-[10px] text-accent">{totalUnread} unread</span></>}
+          <div className="flex-1" />
+          {accountEmail && <span className="text-[10px] text-muted-foreground/60">{accountEmail}</span>}
+          {plan !== "free" && <span className="rounded-full border border-accent/25 bg-accent/10 px-1.5 py-px text-[8px] uppercase tracking-wide text-accent">{plan}</span>}
+        </footer>
+      </div>
+
+      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} onUpgraded={() => { setCanSend(true); setUpgradeOpen(false) }} />
+      <ConfirmModal open={Boolean(burnAliasTarget)} onClose={() => setBurnAliasTarget(null)} onConfirm={async () => {
+        if (!burnAliasTarget) return; setBurningAliasId(burnAliasTarget.id); setActionError(null)
+        try { await burnAlias(burnAliasTarget.id); const burnedHandle = burnAliasTarget.handle; setAliases((prev) => prev.filter((a) => a.id !== burnAliasTarget.id)); if (selectedAlias === burnedHandle) { const remaining = aliases.filter((a) => a.id !== burnAliasTarget.id); setSelectedAlias(remaining[0]?.handle ?? null); setSelectedId(null) } setBurnAliasTarget(null) }
+        catch { setActionError("Could not burn alias.") } finally { setBurningAliasId(null) }
+      }} loading={Boolean(burningAliasId)} title="Burn alias?" description="Permanently destroy this alias. Senders will get a hard bounce." confirmLabel="Burn" variant="destructive" icon="ph:fire" highlight={burnAliasTarget?.handle} />
+      <KeyboardShortcutsOverlay open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <SendToastHost />
+    </LayoutGroup>
+  )
+}
