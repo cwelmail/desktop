@@ -33,7 +33,7 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
   useEffect(() => {
     if (typeof window === "undefined") return
     let cancelled = false
-    let source: EventSource | null = null
+    let abortController: AbortController | null = null
     let retryTimer: ReturnType<typeof window.setTimeout> | undefined
     let retries = 0
 
@@ -64,79 +64,98 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
       }
     }
 
-    async function verifyTokenWithServer(token: string): Promise<boolean> {
-      try {
-        const res = await fetch(`${API_BASE}/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        return res.ok
-      } catch {
-        return true
-      }
-    }
-
-    function openSse() {
+    async function openSse() {
       if (cancelled) return
       const token = getToken()
       if (!token || isTokenExpired(token)) {
         expireSession()
         return
       }
-      const url = `${API_BASE}/events/stream?token=${encodeURIComponent(token)}`
-      let everOpened = false
-      source = new EventSource(url)
 
-      source.addEventListener("open", () => {
-        everOpened = true
+      abortController = new AbortController()
+      try {
+        const res = await fetch(`${API_BASE}/events/stream`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: abortController.signal,
+        })
+
+        if (!res.ok) {
+          console.log(`[aeri] SSE stream returned ${res.status}`)
+          abortController = null
+          if (res.status === 401) {
+            expireSession()
+            return
+          }
+          retries++
+          if (cancelled) return
+          if (retries >= MAX_RETRIES) {
+            retries = 0
+            retryTimer = window.setTimeout(connect, BASE_RETRY_MS)
+            return
+          }
+          const delay = Math.min(BASE_RETRY_MS * Math.pow(1.5, retries - 1), MAX_RETRY_MS)
+          setReconnecting(true)
+          retryTimer = window.setTimeout(connect, delay)
+          return
+        }
+
+        retries = 0
         setConnected(true)
         setReconnecting(false)
-        retries = 0
-      })
+        console.log("[aeri] SSE stream connected")
 
-      const events: RealtimeEvent[] = ["inbox.changed", "aliases.changed", "billing.changed"]
-      for (const event of events) {
-        source.addEventListener(event, () => { dispatch(event) })
-      }
-      source.addEventListener("new_message", () => { dispatch("inbox.changed") })
+        const reader = res.body!.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
 
-      source.onerror = () => {
-        setConnected(false)
-        source?.close()
-        source = null
-        if (cancelled) return
-        retries++
-        const token = getToken()
-        if (!token || isTokenExpired(token)) {
-          expireSession()
-          return
-        }
-        if (!everOpened) {
-          console.log("[aeri] SSE rejected without open, verifying token with /auth/me")
-          void verifyTokenWithServer(token).then((valid) => {
-            if (cancelled) return
-            if (!valid) {
-              expireSession()
-            } else {
-              setReconnecting(true)
-              retryTimer = window.setTimeout(connect, BASE_RETRY_MS)
+        while (!cancelled) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split("\n")
+          buffer = lines.pop() || ""
+          let eventType = ""
+          for (const line of lines) {
+            if (line.startsWith("event:")) {
+              eventType = line.slice(6).trim()
+            } else if (line.startsWith("data:")) {
+              const data = line.slice(5).trim()
+              if (eventType === "connected") continue
+              if (eventType === "inbox.changed" || eventType === "aliases.changed" || eventType === "billing.changed" || eventType === "new_message") {
+                dispatch(eventType === "new_message" ? "inbox.changed" : eventType as RealtimeEvent)
+              }
+              eventType = ""
+            } else if (line.trim() === "") {
+              eventType = ""
             }
-          })
-          return
+          }
         }
-        if (retries >= MAX_RETRIES) {
-          retries = 0
-          retryTimer = window.setTimeout(connect, BASE_RETRY_MS)
-          return
-        }
-        const delay = Math.min(BASE_RETRY_MS * Math.pow(1.5, retries - 1), MAX_RETRY_MS)
-        setReconnecting(true)
-        retryTimer = window.setTimeout(connect, delay)
+      } catch (err) {
+        if (cancelled || (err instanceof DOMException && err.name === "AbortError")) return
+        console.log("[aeri] SSE stream error:", err)
+      } finally {
+        abortController = null
       }
+
+      if (cancelled) return
+      retries++
+      const token = getToken()
+      if (!token || isTokenExpired(token)) {
+        expireSession()
+        return
+      }
+      if (retries >= MAX_RETRIES) {
+        retries = 0
+        retryTimer = window.setTimeout(connect, BASE_RETRY_MS)
+        return
+      }
+      const delay = Math.min(BASE_RETRY_MS * Math.pow(1.5, retries - 1), MAX_RETRY_MS)
+      setReconnecting(true)
+      retryTimer = window.setTimeout(connect, delay)
     }
 
     function connect() {
-      source?.close()
-      source = null
+      if (abortController) { abortController.abort(); abortController = null }
       if (retryTimer) window.clearTimeout(retryTimer)
       const token = getToken()
       if (!token || isTokenExpired(token)) {
@@ -150,7 +169,7 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
     return () => {
       cancelled = true
       if (retryTimer) window.clearTimeout(retryTimer)
-      source?.close()
+      if (abortController) abortController.abort()
       setConnected(false)
       setReconnecting(false)
     }
