@@ -44,7 +44,8 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
     function isTokenExpired(token: string | null): boolean {
       if (!token) return true
       try {
-        const payload = JSON.parse(atob(token.split(".")[1]))
+        const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")
+        const payload = JSON.parse(atob(base64))
         return Date.now() >= (payload.exp || 0) * 1000
       } catch {
         return true
@@ -55,7 +56,11 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
       localStorage.removeItem("aeri_session_token")
       setConnected(false)
       setReconnecting(false)
-      window.location.reload()
+      if (window.electronAPI?.forceSignIn) {
+        window.electronAPI.forceSignIn()
+      } else {
+        window.location.href = "/sign-in"
+      }
     }
 
     function openSse() {

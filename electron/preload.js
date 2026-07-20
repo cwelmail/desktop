@@ -22,4 +22,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // Tray panel receives state
   onTrayState: (callback) => ipcRenderer.on("tray-state", (_event, state) => callback(state)),
+
+  // Force sign-in navigation from renderer
+  forceSignIn: () => ipcRenderer.send("force-sign-in"),
 })

@@ -353,3 +353,9 @@ ipcMain.on("tray-quit", () => {
   isQuitting = true
   app.quit()
 })
+
+ipcMain.on("force-sign-in", () => {
+  if (mainWindow) {
+    mainWindow.loadURL(isDev ? `http://localhost:${NEXT_PORT}/sign-in` : "app://localhost/sign-in")
+  }
+})
