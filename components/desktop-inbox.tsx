@@ -142,7 +142,7 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
   }, [loadAliases, loadMessages, router])
 
   const refreshCanSend = useCallback(async () => {
-    try { const account = await getMe(); setCanSend(account.can_send); setAccountEmail(account.email || ""); return account.can_send }
+    try { const account = await getMe(); setCanSend(account.can_send); setAccountEmail(account.primary_alias || ""); return account.can_send }
     catch { setCanSend(false); return false }
   }, [])
 
@@ -207,7 +207,6 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
           subject: m.subject,
           receivedAt: m.receivedAt,
         })),
-        aliases: aliases.map((a) => ({ handle: a.handle, unread: a.unread })),
         accountEmail,
         plan,
         connected: !realtimeReconnecting,

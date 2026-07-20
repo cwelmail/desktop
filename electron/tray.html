@@ -220,7 +220,7 @@ function timeAgo(ts){
 }
 function esc(s){const d=document.createElement("div");d.textContent=s||"";return d.innerHTML;}
 
-let state={totalUnread:0,recentMessages:[],aliases:[],accountEmail:"",plan:"",connected:true,reconnecting:false};
+let state={totalUnread:0,recentMessages:[],accountEmail:"",plan:"",connected:true,reconnecting:false};
 
 function render(){
   const s=state,panel=document.getElementById("panel");
@@ -252,21 +252,7 @@ function render(){
     h+=`</div>`;
   }
 
-  if(s.aliases.length>0){
-    h+=`<div class="section"><div class="label">Aliases</div>`;
-    for(let i=0;i<s.aliases.length;i++){
-      const a=s.aliases[i];
-      const local=(a.handle||"").split("@")[0];
-      h+=`<div class="item clickable" data-action="select-alias" data-handle="${esc(a.handle)}">
-        <div class="text"><div class="primary" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px">${esc(local)}</div></div>
-        <div class="right">${a.unread>0?`<span class="badge">${a.unread}</span>`:""}</div>
-      </div>`;
-      if(i<s.aliases.length-1)h+=`<div class="row-separator"></div>`;
-    }
-    h+=`</div>`;
-  }
-
-  if(s.recentMessages.length===0&&s.aliases.length===0){
+  if(s.recentMessages.length===0){
     h+=`<div class="section"><div class="empty">No messages</div></div>`;
   }
 
@@ -285,8 +271,7 @@ function render(){
   panel.querySelectorAll("[data-action]").forEach(el=>{
     el.addEventListener("click",()=>{
       const a=el.dataset.action;
-      if(a==="select-alias")electronAPI.selectAliasFromTray(el.dataset.handle);
-      else if(a==="compose")electronAPI.composeFromTray();
+      if(a==="compose")electronAPI.composeFromTray();
       else if(a==="open-inbox")electronAPI.openInboxFromTray();
       else if(a==="quit")electronAPI.quitFromTray();
     });
