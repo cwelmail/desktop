@@ -72,7 +72,7 @@ function createTrayPanel() {
   const trayIconBounds = tray.getBounds()
   const display = screen.getDisplayMatching(trayIconBounds)
   const screenBounds = display.bounds
-  const panelWidth = 360
+  const panelWidth = 300
   const panelHeight = 520
   const margin = 8
 

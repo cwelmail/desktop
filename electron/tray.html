@@ -9,7 +9,7 @@
   body {
     font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
     background: transparent;
-    color: #1d1d1f;
+    color: var(--fg);
     font-size: 13px;
     line-height: 1.35;
     -webkit-font-smoothing: antialiased;
@@ -17,38 +17,26 @@
     overflow: hidden;
   }
 
-  @media (prefers-color-scheme: dark) {
-    body { color: #f5f5f7; }
-    .panel { background: rgba(30,30,30,0.92); border-color: rgba(255,255,255,0.08); }
-    .section + .section { border-top-color: rgba(255,255,255,0.06); }
-    .item:hover { background: rgba(255,255,255,0.06); }
-    .muted { color: #98989d; }
-    .dim { color: #636366; }
-    .avatar { color: #fff; }
-    .badge { background: rgba(255,255,255,0.08); color: #98989d; }
-    .dot { background: #30d158; }
-    .dot.away { background: #ffd60a; }
-    .row-separator { background: rgba(255,255,255,0.06); }
-  }
-
-  @media (prefers-color-scheme: light) {
-    .panel { background: rgba(255,255,255,0.92); border-color: rgba(0,0,0,0.08); }
-    .section + .section { border-top-color: rgba(0,0,0,0.06); }
-    .item:hover { background: rgba(0,0,0,0.04); }
-    .muted { color: #86868b; }
-    .dim { color: #aeaeb2; }
-    .avatar { color: #fff; }
-    .badge { background: rgba(0,0,0,0.06); color: #86868b; }
-    .dot { background: #34c759; }
-    .dot.away { background: #ff9f0a; }
-    .row-separator { background: rgba(0,0,0,0.06); }
+  :root {
+    --fg: #1d1d1f;
+    --muted: #86868b;
+    --dim: #aeaeb2;
+    --bg: rgba(255,255,255,0.95);
+    --border: rgba(0,0,0,0.1);
+    --sep: rgba(0,0,0,0.1);
+    --hover: rgba(0,0,0,0.04);
+    --badge-bg: rgba(0,0,0,0.06);
+    --badge-fg: #86868b;
+    --dot: #34c759;
+    --dot-away: #ff9f0a;
+    --accent: #007aff;
   }
 
   .panel {
     width: 300px;
-    border-radius: 12px;
-    border: 0.5px solid;
-    box-shadow: 0 8px 40px rgba(0,0,0,0.25), 0 0 0 0.5px rgba(0,0,0,0.08);
+    border-radius: 10px;
+    border: 0.5px solid var(--border);
+    background: var(--bg);
     overflow: hidden;
   }
 
@@ -59,12 +47,8 @@
   }
   .scroll::-webkit-scrollbar { display: none; }
 
-  .section {
-    padding: 5px 0;
-  }
-  .section + .section {
-    border-top: 0.5px solid;
-  }
+  .section { padding: 5px 0; }
+  .section + .section { border-top: 0.5px solid var(--sep); }
 
   .item {
     display: flex;
@@ -75,27 +59,21 @@
     transition: background 0.08s;
   }
   .item.clickable { cursor: pointer; }
-  .item.clickable:hover { background: rgba(0,0,0,0.04); }
+  .item.clickable:hover { background: var(--hover); }
 
-  @media (prefers-color-scheme: dark) {
-    .item.clickable:hover { background: rgba(255,255,255,0.06); }
-  }
-
-  /* Avatar */
   .avatar {
     width: 26px; height: 26px;
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     font-size: 11px; font-weight: 600;
     flex-shrink: 0;
+    color: #fff;
   }
 
-  /* Text */
   .text { flex: 1; min-width: 0; }
   .primary { font-size: 13px; font-weight: 400; }
-  .secondary { font-size: 12px; }
-  .muted { font-size: 12px; }
-  .dim { font-size: 11px; }
+  .muted { font-size: 12px; color: var(--muted); }
+  .dim { font-size: 11px; color: var(--dim); }
 
   .truncate {
     white-space: nowrap;
@@ -103,14 +81,12 @@
     text-overflow: ellipsis;
   }
 
-  /* Right side */
   .right {
     display: flex;
     align-items: center;
     gap: 5px;
     flex-shrink: 0;
   }
-  .right .dim { font-size: 11px; }
 
   .badge {
     font-size: 11px;
@@ -123,15 +99,18 @@
     border-radius: 9px;
     padding: 0 5px;
     font-variant-numeric: tabular-nums;
+    background: var(--badge-bg);
+    color: var(--badge-fg);
   }
 
   .dot {
     width: 7px; height: 7px;
     border-radius: 50%;
     flex-shrink: 0;
+    background: var(--dot);
   }
+  .dot.away { background: var(--dot-away); }
 
-  /* Status row */
   .status-row {
     display: flex;
     align-items: center;
@@ -139,28 +118,20 @@
     padding: 5px 12px;
   }
 
-  /* Label row (section header) */
   .label {
     padding: 8px 12px 3px;
     font-size: 11px;
     font-weight: 500;
     letter-spacing: 0.01em;
+    color: var(--dim);
   }
 
-  @media (prefers-color-scheme: dark) {
-    .label { color: #636366; }
-  }
-  @media (prefers-color-scheme: light) {
-    .label { color: #86868b; }
-  }
-
-  /* Separator */
   .row-separator {
     height: 0.5px;
     margin: 0 12px;
+    background: var(--sep);
   }
 
-  /* Action row */
   .actions {
     display: flex;
     padding: 5px 8px;
@@ -181,43 +152,17 @@
     cursor: pointer;
     border-radius: 6px;
     transition: background 0.08s;
+    color: var(--accent);
   }
-  .action-btn:hover {
-    background: rgba(0,0,0,0.04);
-  }
-  @media (prefers-color-scheme: dark) {
-    .action-btn:hover { background: rgba(255,255,255,0.06); }
-  }
+  .action-btn:hover { background: var(--hover); }
   .action-btn:active { opacity: 0.6; }
-
-  @media (prefers-color-scheme: dark) {
-    .action-btn { color: #0a84ff; }
-  }
-  @media (prefers-color-scheme: light) {
-    .action-btn { color: #007aff; }
-  }
-
   .action-btn svg { width: 14px; height: 14px; }
-
-  /* Footer link */
-  .footer-link {
-    display: block;
-    text-align: center;
-    padding: 8px 12px;
-    font-size: 12px;
-    cursor: pointer;
-  }
-  @media (prefers-color-scheme: dark) {
-    .footer-link { color: #ff453a; }
-  }
-  @media (prefers-color-scheme: light) {
-    .footer-link { color: #ff3b30; }
-  }
-  .footer-link:hover { opacity: 0.7; }
+  .action-btn.quit { color: var(--fg); opacity: 0.4; }
 
   .empty {
     padding: 16px 12px;
     text-align: center;
+    color: var(--muted);
   }
 </style>
 </head>
@@ -225,125 +170,130 @@
 <div class="panel" id="panel"></div>
 
 <script>
-const COLORS = [
-  "#ff3b30","#ff9500","#ffcc00","#34c759","#00c7be",
-  "#30b0c7","#007aff","#5856d6","#af52de","#ff2d55",
-  "#a2845e","#8e8e93"
-];
-
-function hash(s) { let h=0; for(let i=0;i<s.length;i++) h=((h<<5)-h+s.charCodeAt(i))|0; return Math.abs(h); }
-function color(s) { return COLORS[hash(s)%COLORS.length]; }
-function initials(from, name) {
-  const n = name || from?.split("@")[0] || "?";
-  const parts = n.replace(/[._-]/g," ").trim().split(/\s+/);
-  if (parts.length >= 2) return (parts[0][0]+parts[1][0]).toUpperCase();
-  return n.slice(0,2).toUpperCase();
+const isDark = window.matchMedia("(prefers-color-scheme: dark)");
+function applyTheme() {
+  const d = isDark.matches;
+  const r = document.documentElement.style;
+  if (d) {
+    r.setProperty("--fg", "#f5f5f7");
+    r.setProperty("--muted", "#98989d");
+    r.setProperty("--dim", "#636366");
+    r.setProperty("--bg", "rgba(30,30,30,0.95)");
+    r.setProperty("--border", "rgba(255,255,255,0.12)");
+    r.setProperty("--sep", "rgba(255,255,255,0.12)");
+    r.setProperty("--hover", "rgba(255,255,255,0.06)");
+    r.setProperty("--badge-bg", "rgba(255,255,255,0.08)");
+    r.setProperty("--badge-fg", "#98989d");
+    r.setProperty("--dot", "#30d158");
+    r.setProperty("--dot-away", "#ffd60a");
+    r.setProperty("--accent", "#0a84ff");
+  } else {
+    r.setProperty("--fg", "#1d1d1f");
+    r.setProperty("--muted", "#86868b");
+    r.setProperty("--dim", "#aeaeb2");
+    r.setProperty("--bg", "rgba(255,255,255,0.95)");
+    r.setProperty("--border", "rgba(0,0,0,0.12)");
+    r.setProperty("--sep", "rgba(0,0,0,0.12)");
+    r.setProperty("--hover", "rgba(0,0,0,0.04)");
+    r.setProperty("--badge-bg", "rgba(0,0,0,0.06)");
+    r.setProperty("--badge-fg", "#86868b");
+    r.setProperty("--dot", "#34c759");
+    r.setProperty("--dot-away", "#ff9f0a");
+    r.setProperty("--accent", "#007aff");
+  }
 }
-function timeAgo(ts) {
-  if(!ts) return "";
-  const d = Date.now()-new Date(ts).getTime();
-  if(isNaN(d)) return "";
-  if(d<60000) return "now";
-  if(d<3600000) return Math.floor(d/60000)+"m";
-  if(d<86400000) return Math.floor(d/3600000)+"h";
-  return Math.floor(d/86400000)+"d";
+applyTheme();
+isDark.addEventListener("change", applyTheme);
+
+const COLORS = ["#ff3b30","#ff9500","#ffcc00","#34c759","#00c7be","#30b0c7","#007aff","#5856d6","#af52de","#ff2d55","#a2845e","#8e8e93"];
+function hash(s){let h=0;for(let i=0;i<s.length;i++)h=((h<<5)-h+s.charCodeAt(i))|0;return Math.abs(h);}
+function color(s){return COLORS[hash(s)%COLORS.length];}
+function initials(from,name){
+  const n=name||from?.split("@")[0]||"?";
+  const p=n.replace(/[._-]/g," ").trim().split(/\s+/);
+  return p.length>=2?(p[0][0]+p[1][0]).toUpperCase():n.slice(0,2).toUpperCase();
 }
-function esc(s) { const d=document.createElement("div"); d.textContent=s||""; return d.innerHTML; }
+function timeAgo(ts){
+  if(!ts)return"";const d=Date.now()-new Date(ts).getTime();
+  if(isNaN(d))return"";if(d<60000)return"now";if(d<3600000)return Math.floor(d/60000)+"m";
+  if(d<86400000)return Math.floor(d/3600000)+"h";return Math.floor(d/86400000)+"d";
+}
+function esc(s){const d=document.createElement("div");d.textContent=s||"";return d.innerHTML;}
 
-let state = { totalUnread:0, recentMessages:[], aliases:[], accountEmail:"", plan:"", connected:true, reconnecting:false };
+let state={totalUnread:0,recentMessages:[],aliases:[],accountEmail:"",plan:"",connected:true,reconnecting:false};
 
-function render() {
-  const s = state;
-  const panel = document.getElementById("panel");
-  let h = "";
+function render(){
+  const s=state,panel=document.getElementById("panel");
+  let h="";
 
-  // Status
-  const connected = !s.reconnecting && s.connected;
-  h += `<div class="section">
+  const connected=!s.reconnecting&&s.connected;
+  h+=`<div class="section">
     <div class="status-row">
       <span class="dot${connected?"":" away"}"></span>
-      <span class="primary">${esc(s.accountEmail || "Not signed in")}</span>
-      <span class="right">
-        <span class="badge">${s.totalUnread||""}</span>
-      </span>
+      <span class="primary">${esc(s.accountEmail||"Not signed in")}</span>
+      <span class="right"><span class="badge">${s.totalUnread||""}</span></span>
     </div>
   </div>`;
 
-  // Messages
-  if (s.recentMessages.length > 0) {
-    h += `<div class="section">`;
-    h += `<div class="label">Messages</div>`;
-    for (let i = 0; i < s.recentMessages.length; i++) {
-      const m = s.recentMessages[i];
-      const c = color(m.from||"");
-      const ini = initials(m.from, m.senderName);
-      const name = m.senderName || m.from?.split("@")[0] || m.from || "";
-      h += `<div class="item clickable" data-action="open-inbox">
+  if(s.recentMessages.length>0){
+    h+=`<div class="section"><div class="label">Messages</div>`;
+    for(let i=0;i<s.recentMessages.length;i++){
+      const m=s.recentMessages[i];
+      const c=color(m.from||"");
+      const ini=initials(m.from,m.senderName);
+      const name=m.senderName||m.from?.split("@")[0]||m.from||"";
+      h+=`<div class="item clickable" data-action="open-inbox">
         <div class="avatar" style="background:${c}">${esc(ini)}</div>
-        <div class="text">
-          <div class="primary truncate">${esc(name)}</div>
-          <div class="muted truncate">${esc(m.subject)}</div>
-        </div>
+        <div class="text"><div class="primary truncate">${esc(name)}</div><div class="muted truncate">${esc(m.subject)}</div></div>
         <div class="right"><span class="dim">${timeAgo(m.receivedAt)}</span></div>
       </div>`;
-      if (i < s.recentMessages.length - 1) h += `<div class="row-separator"></div>`;
+      if(i<s.recentMessages.length-1)h+=`<div class="row-separator"></div>`;
     }
-    h += `</div>`;
+    h+=`</div>`;
   }
 
-  // Aliases
-  if (s.aliases.length > 0) {
-    h += `<div class="section">`;
-    h += `<div class="label">Aliases</div>`;
-    for (let i = 0; i < s.aliases.length; i++) {
-      const a = s.aliases[i];
-      const local = (a.handle||"").split("@")[0];
-      h += `<div class="item clickable" data-action="select-alias" data-handle="${esc(a.handle)}">
+  if(s.aliases.length>0){
+    h+=`<div class="section"><div class="label">Aliases</div>`;
+    for(let i=0;i<s.aliases.length;i++){
+      const a=s.aliases[i];
+      const local=(a.handle||"").split("@")[0];
+      h+=`<div class="item clickable" data-action="select-alias" data-handle="${esc(a.handle)}">
         <div class="text"><div class="primary" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px">${esc(local)}</div></div>
         <div class="right">${a.unread>0?`<span class="badge">${a.unread}</span>`:""}</div>
       </div>`;
-      if (i < s.aliases.length - 1) h += `<div class="row-separator"></div>`;
+      if(i<s.aliases.length-1)h+=`<div class="row-separator"></div>`;
     }
-    h += `</div>`;
+    h+=`</div>`;
   }
 
-  if (s.recentMessages.length === 0 && s.aliases.length === 0) {
-    h += `<div class="section"><div class="empty muted">No messages</div></div>`;
+  if(s.recentMessages.length===0&&s.aliases.length===0){
+    h+=`<div class="section"><div class="empty">No messages</div></div>`;
   }
 
-  // Actions
-  h += `<div class="section">
+  h+=`<div class="section">
     <div class="actions">
       <button class="action-btn" data-action="compose">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
         Compose
       </button>
       <button class="action-btn" data-action="open-inbox">Inbox</button>
-      <button class="action-btn" data-action="quit" style="color:inherit;opacity:0.4">Quit</button>
+      <button class="action-btn quit" data-action="quit">Quit</button>
     </div>
   </div>`;
 
-  panel.innerHTML = h;
-
-  panel.querySelectorAll("[data-action]").forEach(el => {
-    el.addEventListener("click", () => {
-      const a = el.dataset.action;
-      if (a==="select-alias") window.api.selectAlias(el.dataset.handle);
-      else if (a==="compose") window.api.compose();
-      else if (a==="open-inbox") window.api.openInbox();
-      else if (a==="quit") window.api.quit();
+  panel.innerHTML=h;
+  panel.querySelectorAll("[data-action]").forEach(el=>{
+    el.addEventListener("click",()=>{
+      const a=el.dataset.action;
+      if(a==="select-alias")electronAPI.selectAliasFromTray(el.dataset.handle);
+      else if(a==="compose")electronAPI.composeFromTray();
+      else if(a==="open-inbox")electronAPI.openInboxFromTray();
+      else if(a==="quit")electronAPI.quitFromTray();
     });
   });
 }
 
-window.api = {
-  updateState: (s) => { state = { ...state, ...s }; render(); },
-  selectAlias: (h) => { electronAPI?.selectAliasFromTray?.(h); },
-  compose: () => { electronAPI?.composeFromTray?.(); },
-  openInbox: () => { electronAPI?.openInboxFromTray?.(); },
-  quit: () => { electronAPI?.quitFromTray?.(); },
-};
-
+electronAPI.onTrayState((s)=>{state={...state,...s};render();});
 render();
 </script>
 </body>
