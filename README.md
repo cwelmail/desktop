@@ -8,6 +8,14 @@ Built with Electron + Next.js + React 19 + Tailwind CSS.
 
 Download the latest `.dmg` from [Releases](https://github.com/cwelmail/desktop/releases) and drag **aeri** into Applications.
 
+If macOS says the app is **damaged** (unsigned build / Gatekeeper quarantine), clear the quarantine flag once:
+
+```bash
+xattr -cr /Applications/aeri.app
+```
+
+Then open **aeri** again from Applications (or Spotlight).
+
 ## Development
 
 ```bash
@@ -23,7 +31,7 @@ This starts the Next.js dev server on `localhost:3000` and launches Electron poi
 npm run build
 ```
 
-Produces a signed DMG in `dist-electron/`.
+Produces an Apple Silicon DMG in `dist-electron/` (`aeri-1.0.0-arm64.dmg`). The app is deep ad-hoc signed so the bundle is not “linker-only” broken; full Developer ID + notarization is still required to skip Gatekeeper on download without `xattr`.
 
 ## Tech stack
 
@@ -40,6 +48,7 @@ app/               Next.js pages (onboarding, sign-in, inbox)
 components/        UI components (inbox, compose, modals)
 lib/               API client, auth, types, utilities
 public/            Static assets (icon)
+build/             macOS entitlements for packaging
 ```
 
 ## License

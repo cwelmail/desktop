@@ -1,13 +1,13 @@
 {
   "name": "aeri-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "aeri — Anonymous, private email desktop client",
   "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
     "build:next": "next build",
-    "build:electron": "electron-builder --mac",
+    "build:electron": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --arm64",
     "build": "npm run build:next && npm run build:electron",
     "start": "next start",
     "generate-icon": "node scripts/generate-icon.mjs"
@@ -46,20 +46,38 @@
     "appId": "rest.aeri.desktop",
     "productName": "aeri",
     "directories": {
-      "output": "dist-electron"
+      "output": "dist-electron",
+      "buildResources": "build"
     },
     "files": [
       "electron/**/*",
       "out/**/*",
       "package.json"
     ],
+    "afterPack": "./scripts/after-pack.js",
     "mac": {
-      "target": "dmg",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64"]
+        }
+      ],
       "category": "public.app-category.productivity",
-      "icon": "public/icon.png"
+      "icon": "public/icon.png",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "aeri may need Apple Events for system integration.",
+        "ElectronTeamID": ""
+      }
     },
     "dmg": {
       "title": "aeri",
+      "sign": false,
+      "writeUpdateInfo": false,
       "contents": [
         {
           "x": 130,
