@@ -37,7 +37,19 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
     let retryTimer: ReturnType<typeof window.setTimeout> | undefined
     let retries = 0
 
+    function isTokenExpired(): boolean {
+      const token = localStorage.getItem("aeri_session_token")
+      if (!token) return true
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]))
+        return Date.now() >= (payload.exp || 0) * 1000
+      } catch {
+        return true
+      }
+    }
+
     async function checkTokenValid(): Promise<boolean> {
+      if (isTokenExpired()) return false
       const token = localStorage.getItem("aeri_session_token")
       if (!token) return false
       try {
@@ -79,6 +91,12 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
         source = null
         if (cancelled) return
         retries++
+        if (isTokenExpired()) {
+          localStorage.removeItem("aeri_session_token")
+          setReconnecting(false)
+          window.location.href = "/sign-in"
+          return
+        }
         void checkTokenValid().then((valid) => {
           if (cancelled) return
           if (!valid) {
