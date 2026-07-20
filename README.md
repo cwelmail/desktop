@@ -31,7 +31,7 @@ This starts the Next.js dev server on `localhost:3000` and launches Electron poi
 npm run build
 ```
 
-Produces an Apple Silicon DMG in `dist-electron/` (`aeri-1.0.0-arm64.dmg`). The app is deep ad-hoc signed so the bundle is not “linker-only” broken; full Developer ID + notarization is still required to skip Gatekeeper on download without `xattr`.
+Produces an Apple Silicon DMG in `dist-electron/` (`aeri-1.0.1-arm64.dmg`). The app is deep ad-hoc signed so the bundle is not “linker-only” broken; full Developer ID + notarization is still required to skip Gatekeeper on download without `xattr`.
 
 ## Tech stack
 
