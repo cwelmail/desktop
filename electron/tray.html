@@ -242,7 +242,7 @@ function render(){
       const c=color(m.from||"");
       const ini=initials(m.from,m.senderName);
       const name=m.senderName||m.from?.split("@")[0]||m.from||"";
-      h+=`<div class="item clickable" data-action="open-inbox">
+      h+=`<div class="item clickable" data-action="open-message" data-id="${esc(m.id||"")}" data-alias="${esc(m.alias||"")}">
         <div class="avatar" style="background:${c}">${esc(ini)}</div>
         <div class="text"><div class="primary truncate" style="${m.unread?"font-weight:600":""}">${esc(name)}</div><div class="muted truncate">${esc(m.subject)}</div></div>
         <div class="right"><span class="dim">${timeAgo(m.receivedAt)}</span></div>
@@ -272,6 +272,7 @@ function render(){
     el.addEventListener("click",()=>{
       const a=el.dataset.action;
       if(a==="compose")electronAPI.composeFromTray();
+      else if(a==="open-message")electronAPI.openMessageFromTray({ id: el.dataset.id, alias: el.dataset.alias || undefined });
       else if(a==="open-inbox")electronAPI.openInboxFromTray();
       else if(a==="quit")electronAPI.quitFromTray();
     });

@@ -10,10 +10,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onCompose: (callback) => ipcRenderer.on("compose", () => callback()),
   onFocusSearch: (callback) => ipcRenderer.on("focus-search", () => callback()),
   onSelectAlias: (callback) => ipcRenderer.on("select-alias", (_event, handle) => callback(handle)),
+  onOpenMessage: (callback) => ipcRenderer.on("open-message", (_event, payload) => callback(payload)),
   onRefreshInbox: (callback) => ipcRenderer.on("refresh-inbox", () => callback()),
 
   // Tray panel API (called from tray.html)
   selectAliasFromTray: (handle) => ipcRenderer.send("tray-select-alias", handle),
+  openMessageFromTray: (payload) => ipcRenderer.send("tray-open-message", payload),
   composeFromTray: () => ipcRenderer.send("tray-compose"),
   focusSearchFromTray: () => ipcRenderer.send("tray-search"),
   openInboxFromTray: () => ipcRenderer.send("tray-open-inbox"),

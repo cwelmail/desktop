@@ -329,6 +329,15 @@ ipcMain.on("tray-select-alias", (_event, handle) => {
   }
 })
 
+ipcMain.on("tray-open-message", (_event, payload) => {
+  closeTrayPanel()
+  if (mainWindow) {
+    mainWindow.show()
+    mainWindow.focus()
+    mainWindow.webContents.send("open-message", payload)
+  }
+})
+
 ipcMain.on("tray-compose", () => {
   closeTrayPanel()
   focusMainWindow()

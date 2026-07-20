@@ -122,6 +122,8 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
   const searchRef = useRef<HTMLInputElement>(null)
   const messagesLoadEpochRef = useRef(0)
   const aliasDropdownRef = useRef<HTMLDivElement>(null)
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
 
   const loadAliases = useCallback(async () => {
     const data = await listAliases()
@@ -213,6 +215,8 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
         })
         .slice(0, 6)
         .map((m) => ({
+          id: m.id,
+          alias: m.alias,
           from: m.from,
           senderName: senderDisplayName(m.from, m.senderName),
           subject: m.subject,
@@ -244,8 +248,30 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
     window.electronAPI.onCompose?.(() => { void refreshCanSend().then(() => { setReplyTo(null); setSelectedId(null); setComposeOpen(true) }) })
     window.electronAPI.onFocusSearch?.(() => searchRef.current?.focus())
     window.electronAPI.onSelectAlias?.((handle) => { setSelectedAlias(handle); setView("inbox"); setSelectedId(null) })
+    window.electronAPI.onOpenMessage?.((payload) => {
+      const messageId = typeof payload === "string" ? payload : payload?.id
+      const alias = typeof payload === "object" && payload ? payload.alias : undefined
+      if (!messageId) return
+      setComposeOpen(false)
+      setReplyTo(null)
+      setFilterUnread(false)
+      setFilterAttachments(false)
+      setSearch("")
+      setView("inbox")
+      if (alias) setSelectedAlias(alias)
+      setSelectedId(messageId)
+      const target = messagesRef.current.find((m) => m.id === messageId)
+      if (target?.unread) {
+        void patchMessage(messageId, { read: true })
+          .then((updated) => {
+            setMessages((prev) => prev.map((m) => (m.id === updated.id ? toDemoMessage(updated) : m)))
+            void loadAliases()
+          })
+          .catch(() => {})
+      }
+    })
     window.electronAPI.onRefreshInbox?.(() => { void refreshInbox() })
-  }, [router, refreshCanSend, refreshInbox])
+  }, [router, refreshCanSend, refreshInbox, loadAliases])
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
