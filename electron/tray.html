@@ -6,260 +6,165 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
-  :root {
-    --bg: #09090b;
-    --bg-card: #111113;
-    --bg-hover: #1a1a1f;
-    --bg-accent: rgba(78,163,255,0.08);
-    --border: rgba(255,255,255,0.06);
-    --border-hover: rgba(255,255,255,0.12);
-    --text: #ececef;
-    --text-muted: #71717a;
-    --text-dim: #52525b;
-    --accent: #4ea3ff;
-    --green: #22c55e;
-    --amber: #f59e0b;
-    --red: #ef4444;
-    --radius: 10px;
-    --radius-sm: 6px;
-  }
-
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
     background: transparent;
-    color: var(--text);
+    color: #1d1d1f;
     font-size: 13px;
-    line-height: 1.4;
+    line-height: 1.35;
     -webkit-font-smoothing: antialiased;
     user-select: none;
     overflow: hidden;
   }
 
+  @media (prefers-color-scheme: dark) {
+    body { color: #f5f5f7; }
+    .panel { background: rgba(30,30,30,0.92); border-color: rgba(255,255,255,0.08); }
+    .section + .section { border-top-color: rgba(255,255,255,0.06); }
+    .item:hover { background: rgba(255,255,255,0.06); }
+    .muted { color: #98989d; }
+    .dim { color: #636366; }
+    .avatar { color: #fff; }
+    .badge { background: rgba(255,255,255,0.08); color: #98989d; }
+    .dot { background: #30d158; }
+    .dot.away { background: #ffd60a; }
+    .row-separator { background: rgba(255,255,255,0.06); }
+  }
+
+  @media (prefers-color-scheme: light) {
+    .panel { background: rgba(255,255,255,0.92); border-color: rgba(0,0,0,0.08); }
+    .section + .section { border-top-color: rgba(0,0,0,0.06); }
+    .item:hover { background: rgba(0,0,0,0.04); }
+    .muted { color: #86868b; }
+    .dim { color: #aeaeb2; }
+    .avatar { color: #fff; }
+    .badge { background: rgba(0,0,0,0.06); color: #86868b; }
+    .dot { background: #34c759; }
+    .dot.away { background: #ff9f0a; }
+    .row-separator { background: rgba(0,0,0,0.06); }
+  }
+
   .panel {
-    width: 360px;
-    max-height: 540px;
-    display: flex;
-    flex-direction: column;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    box-shadow: 0 24px 80px rgba(0,0,0,0.6), 0 0 1px rgba(255,255,255,0.08) inset;
+    width: 300px;
+    border-radius: 12px;
+    border: 0.5px solid;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.25), 0 0 0 0.5px rgba(0,0,0,0.08);
     overflow: hidden;
   }
 
   .scroll {
-    flex: 1;
+    max-height: 400px;
     overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255,255,255,0.08) transparent;
+    scrollbar-width: none;
   }
-  .scroll::-webkit-scrollbar { width: 4px; }
-  .scroll::-webkit-scrollbar-track { background: transparent; }
-  .scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+  .scroll::-webkit-scrollbar { display: none; }
 
-  /* ── Header ── */
-  .header {
-    padding: 14px 16px 12px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .header-icon {
-    width: 32px; height: 32px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, var(--accent), #7c5cff);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-  }
-  .header-icon svg { width: 18px; height: 18px; }
-  .header-info { flex: 1; min-width: 0; }
-  .header-email {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .header-meta {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 1px;
-  }
-  .plan-badge {
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    padding: 1px 5px;
-    border-radius: 4px;
-    background: rgba(78,163,255,0.12);
-    color: var(--accent);
-  }
-  .plan-badge.free {
-    background: rgba(255,255,255,0.06);
-    color: var(--text-muted);
-  }
-  .status-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: var(--green);
-  }
-  .status-dot.reconnecting {
-    background: var(--amber);
-    animation: pulse 1.5s infinite;
-  }
-  .status-dot.offline {
-    background: var(--red);
-  }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-  .header-status {
-    font-size: 11px;
-    color: var(--text-muted);
-  }
-
-  /* ── Unread hero ── */
-  .unread-hero {
-    padding: 20px 16px 16px;
-    text-align: center;
-    border-bottom: 1px solid var(--border);
-  }
-  .unread-number {
-    font-size: 40px;
-    font-weight: 700;
-    letter-spacing: -0.03em;
-    line-height: 1;
-    color: var(--text);
-  }
-  .unread-number.zero {
-    color: var(--text-dim);
-    font-size: 20px;
-    font-weight: 500;
-  }
-  .unread-label {
-    font-size: 12px;
-    color: var(--text-muted);
-    margin-top: 4px;
-  }
-
-  /* ── Section ── */
   .section {
-    padding: 8px 0 0;
+    padding: 5px 0;
   }
-  .section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 16px 6px;
-  }
-  .section-title {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-dim);
+  .section + .section {
+    border-top: 0.5px solid;
   }
 
-  /* ── Message cards ── */
-  .msg-list { padding: 0 8px; }
-  .msg-card {
+  .item {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: background 0.12s;
+    padding: 6px 12px;
+    cursor: default;
+    transition: background 0.08s;
   }
-  .msg-card:hover { background: var(--bg-hover); }
-  .msg-card:active { background: rgba(255,255,255,0.04); }
+  .item.clickable { cursor: pointer; }
+  .item.clickable:hover { background: rgba(0,0,0,0.04); }
 
-  .msg-avatar {
-    width: 30px; height: 30px;
+  @media (prefers-color-scheme: dark) {
+    .item.clickable:hover { background: rgba(255,255,255,0.06); }
+  }
+
+  /* Avatar */
+  .avatar {
+    width: 26px; height: 26px;
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     font-size: 11px; font-weight: 600;
-    color: #fff;
     flex-shrink: 0;
-  }
-  .msg-body { flex: 1; min-width: 0; }
-  .msg-top {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-  }
-  .msg-from {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    flex: 1;
-  }
-  .msg-time {
-    font-size: 10px;
-    color: var(--text-dim);
-    flex-shrink: 0;
-    font-variant-numeric: tabular-nums;
-  }
-  .msg-subject {
-    font-size: 12px;
-    color: var(--text-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-top: 1px;
   }
 
-  /* ── Alias rows ── */
-  .alias-list { padding: 0 8px; }
-  .alias-row {
+  /* Text */
+  .text { flex: 1; min-width: 0; }
+  .primary { font-size: 13px; font-weight: 400; }
+  .secondary { font-size: 12px; }
+  .muted { font-size: 12px; }
+  .dim { font-size: 11px; }
+
+  .truncate {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Right side */
+  .right {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 7px 8px;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: background 0.12s;
+    gap: 5px;
+    flex-shrink: 0;
   }
-  .alias-row:hover { background: var(--bg-hover); }
-  .alias-handle {
-    font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  .right .dim { font-size: 11px; }
+
+  .badge {
     font-size: 11px;
-    color: var(--text-muted);
-    flex: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .alias-unread {
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--accent);
-    min-width: 16px;
-    text-align: right;
+    font-weight: 500;
+    min-width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    padding: 0 5px;
     font-variant-numeric: tabular-nums;
   }
-  .alias-dot {
-    width: 5px; height: 5px;
+
+  .dot {
+    width: 7px; height: 7px;
     border-radius: 50%;
-    background: var(--accent);
     flex-shrink: 0;
   }
 
-  /* ── Quick actions ── */
+  /* Status row */
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+  }
+
+  /* Label row (section header) */
+  .label {
+    padding: 8px 12px 3px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .label { color: #636366; }
+  }
+  @media (prefers-color-scheme: light) {
+    .label { color: #86868b; }
+  }
+
+  /* Separator */
+  .row-separator {
+    height: 0.5px;
+    margin: 0 12px;
+  }
+
+  /* Action row */
   .actions {
     display: flex;
-    gap: 6px;
-    padding: 10px 16px 12px;
-    border-top: 1px solid var(--border);
+    padding: 5px 8px;
+    gap: 1px;
   }
   .action-btn {
     flex: 1;
@@ -267,65 +172,52 @@
     align-items: center;
     justify-content: center;
     gap: 5px;
-    padding: 7px 0;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: transparent;
-    color: var(--text-muted);
-    font-size: 11px;
-    font-weight: 500;
+    padding: 6px 0;
+    border: none;
+    background: none;
+    font-size: 12px;
+    font-weight: 400;
+    font-family: inherit;
     cursor: pointer;
-    transition: all 0.15s;
+    border-radius: 6px;
+    transition: background 0.08s;
   }
   .action-btn:hover {
-    background: var(--bg-hover);
-    border-color: var(--border-hover);
-    color: var(--text);
+    background: rgba(0,0,0,0.04);
   }
-  .action-btn:active { background: rgba(255,255,255,0.04); }
-  .action-btn.primary {
-    background: rgba(78,163,255,0.1);
-    border-color: rgba(78,163,255,0.2);
-    color: var(--accent);
+  @media (prefers-color-scheme: dark) {
+    .action-btn:hover { background: rgba(255,255,255,0.06); }
   }
-  .action-btn.primary:hover {
-    background: rgba(78,163,255,0.16);
-  }
-  .action-btn svg { width: 13px; height: 13px; }
+  .action-btn:active { opacity: 0.6; }
 
-  /* ── Footer ── */
-  .footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 16px;
-    border-top: 1px solid var(--border);
+  @media (prefers-color-scheme: dark) {
+    .action-btn { color: #0a84ff; }
   }
-  .footer-btn {
-    background: none;
-    border: none;
-    color: var(--text-dim);
-    font-size: 11px;
-    cursor: pointer;
-    padding: 3px 6px;
-    border-radius: 4px;
-    transition: all 0.12s;
+  @media (prefers-color-scheme: light) {
+    .action-btn { color: #007aff; }
   }
-  .footer-btn:hover { color: var(--text-muted); background: var(--bg-hover); }
-  .footer-btn.quit:hover { color: var(--red); }
-  .footer-btn svg { width: 12px; height: 12px; vertical-align: -1px; margin-right: 3px; }
 
-  /* ── Empty state ── */
-  .empty {
-    padding: 20px 16px;
+  .action-btn svg { width: 14px; height: 14px; }
+
+  /* Footer link */
+  .footer-link {
+    display: block;
     text-align: center;
-    color: var(--text-dim);
+    padding: 8px 12px;
     font-size: 12px;
+    cursor: pointer;
   }
+  @media (prefers-color-scheme: dark) {
+    .footer-link { color: #ff453a; }
+  }
+  @media (prefers-color-scheme: light) {
+    .footer-link { color: #ff3b30; }
+  }
+  .footer-link:hover { opacity: 0.7; }
 
-  /* ── Unread badge pulse ── */
-  .badge-glow {
-    box-shadow: 0 0 12px rgba(78,163,255,0.3);
+  .empty {
+    padding: 16px 12px;
+    text-align: center;
   }
 </style>
 </head>
@@ -333,210 +225,125 @@
 <div class="panel" id="panel"></div>
 
 <script>
-const AVATAR_COLORS = [
-  "#ef4444","#f97316","#eab308","#22c55e","#14b8a6",
-  "#3b82f6","#8b5cf6","#ec4899","#f43f5e","#06b6d4",
-  "#a855f7","#6366f1","#10b981","#f59e0b"
+const COLORS = [
+  "#ff3b30","#ff9500","#ffcc00","#34c759","#00c7be",
+  "#30b0c7","#007aff","#5856d6","#af52de","#ff2d55",
+  "#a2845e","#8e8e93"
 ];
 
-function hashStr(s) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
-}
-function avatarColor(from) { return AVATAR_COLORS[hashStr(from) % AVATAR_COLORS.length]; }
-function senderName(from, name) {
-  if (name) return name;
-  const local = (from || "").split("@")[0] || from || "?";
-  return local.replace(/[._-]/g, " ").replace(/\b\w/g, c => c.toUpperCase()).slice(0, 24);
+function hash(s) { let h=0; for(let i=0;i<s.length;i++) h=((h<<5)-h+s.charCodeAt(i))|0; return Math.abs(h); }
+function color(s) { return COLORS[hash(s)%COLORS.length]; }
+function initials(from, name) {
+  const n = name || from?.split("@")[0] || "?";
+  const parts = n.replace(/[._-]/g," ").trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0]+parts[1][0]).toUpperCase();
+  return n.slice(0,2).toUpperCase();
 }
 function timeAgo(ts) {
-  if (!ts) return "";
-  const now = Date.now();
-  const d = new Date(ts).getTime();
-  if (isNaN(d)) return "";
-  const diff = now - d;
-  if (diff < 60000) return "now";
-  if (diff < 3600000) return Math.floor(diff / 60000) + "m";
-  if (diff < 86400000) return Math.floor(diff / 3600000) + "h";
-  return Math.floor(diff / 86400000) + "d";
+  if(!ts) return "";
+  const d = Date.now()-new Date(ts).getTime();
+  if(isNaN(d)) return "";
+  if(d<60000) return "now";
+  if(d<3600000) return Math.floor(d/60000)+"m";
+  if(d<86400000) return Math.floor(d/3600000)+"h";
+  return Math.floor(d/86400000)+"d";
 }
-function esc(s) {
-  const d = document.createElement("div");
-  d.textContent = s || "";
-  return d.innerHTML;
-}
+function esc(s) { const d=document.createElement("div"); d.textContent=s||""; return d.innerHTML; }
 
-let state = {
-  totalUnread: 0,
-  recentMessages: [],
-  aliases: [],
-  accountEmail: "",
-  plan: "",
-  connected: true,
-  reconnecting: false,
-};
+let state = { totalUnread:0, recentMessages:[], aliases:[], accountEmail:"", plan:"", connected:true, reconnecting:false };
 
 function render() {
   const s = state;
   const panel = document.getElementById("panel");
+  let h = "";
 
-  const planClass = (!s.plan || s.plan === "free") ? "free" : "";
-  const planLabel = (!s.plan || s.plan === "free") ? "Free" : s.plan.charAt(0).toUpperCase() + s.plan.slice(1);
-  const statusClass = s.reconnecting ? "reconnecting" : (!s.connected ? "offline" : "");
-  const statusText = s.reconnecting ? "Reconnecting…" : (!s.connected ? "Offline" : "Connected");
+  // Status
+  const connected = !s.reconnecting && s.connected;
+  h += `<div class="section">
+    <div class="status-row">
+      <span class="dot${connected?"":" away"}"></span>
+      <span class="primary">${esc(s.accountEmail || "Not signed in")}</span>
+      <span class="right">
+        <span class="badge">${s.totalUnread||""}</span>
+      </span>
+    </div>
+  </div>`;
 
-  let html = "";
-
-  // Header
-  html += `
-    <div class="header">
-      <div class="header-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="4" width="20" height="16" rx="2"/>
-          <polyline points="2,4 12,13 22,4"/>
-        </svg>
-      </div>
-      <div class="header-info">
-        <div class="header-email">${esc(s.accountEmail || "Not signed in")}</div>
-        <div class="header-meta">
-          <span class="plan-badge ${planClass}">${planLabel}</span>
-          <span class="status-dot ${statusClass}"></span>
-          <span class="header-status">${statusText}</span>
-        </div>
-      </div>
-    </div>`;
-
-  // Unread hero
-  html += `
-    <div class="unread-hero">
-      <div class="unread-number${s.totalUnread === 0 ? " zero" : ""}">${s.totalUnread === 0 ? "All caught up" : s.totalUnread}</div>
-      <div class="unread-label">${s.totalUnread === 0 ? "No unread messages" : `unread message${s.totalUnread === 1 ? "" : "s"}`}</div>
-    </div>`;
-
-  // Scroll area
-  html += `<div class="scroll">`;
-
-  // Recent messages
+  // Messages
   if (s.recentMessages.length > 0) {
-    html += `
-      <div class="section">
-        <div class="section-header">
-          <span class="section-title">Recent</span>
+    h += `<div class="section">`;
+    h += `<div class="label">Messages</div>`;
+    for (let i = 0; i < s.recentMessages.length; i++) {
+      const m = s.recentMessages[i];
+      const c = color(m.from||"");
+      const ini = initials(m.from, m.senderName);
+      const name = m.senderName || m.from?.split("@")[0] || m.from || "";
+      h += `<div class="item clickable" data-action="open-inbox">
+        <div class="avatar" style="background:${c}">${esc(ini)}</div>
+        <div class="text">
+          <div class="primary truncate">${esc(name)}</div>
+          <div class="muted truncate">${esc(m.subject)}</div>
         </div>
-        <div class="msg-list">`;
-    for (const msg of s.recentMessages.slice(0, 6)) {
-      const color = avatarColor(msg.from || "");
-      const initial = senderName(msg.from, msg.senderName).charAt(0).toUpperCase();
-      html += `
-          <div class="msg-card" data-action="open-inbox">
-            <div class="msg-avatar" style="background:${color}">${initial}</div>
-            <div class="msg-body">
-              <div class="msg-top">
-                <span class="msg-from">${esc(senderName(msg.from, msg.senderName))}</span>
-                <span class="msg-time">${timeAgo(msg.receivedAt)}</span>
-              </div>
-              <div class="msg-subject">${esc(msg.subject)}</div>
-            </div>
-          </div>`;
+        <div class="right"><span class="dim">${timeAgo(m.receivedAt)}</span></div>
+      </div>`;
+      if (i < s.recentMessages.length - 1) h += `<div class="row-separator"></div>`;
     }
-    html += `</div></div>`;
+    h += `</div>`;
   }
 
   // Aliases
   if (s.aliases.length > 0) {
-    html += `
-      <div class="section" style="padding-bottom:4px">
-        <div class="section-header">
-          <span class="section-title">Aliases</span>
-        </div>
-        <div class="alias-list">`;
-    for (const alias of s.aliases) {
-      const local = (alias.handle || "").split("@")[0];
-      html += `
-          <div class="alias-row" data-action="select-alias" data-handle="${esc(alias.handle)}">
-            ${alias.unread > 0 ? '<span class="alias-dot"></span>' : ''}
-            <span class="alias-handle">${esc(local)}</span>
-            ${alias.unread > 0 ? `<span class="alias-unread">${alias.unread}</span>` : ''}
-          </div>`;
+    h += `<div class="section">`;
+    h += `<div class="label">Aliases</div>`;
+    for (let i = 0; i < s.aliases.length; i++) {
+      const a = s.aliases[i];
+      const local = (a.handle||"").split("@")[0];
+      h += `<div class="item clickable" data-action="select-alias" data-handle="${esc(a.handle)}">
+        <div class="text"><div class="primary" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px">${esc(local)}</div></div>
+        <div class="right">${a.unread>0?`<span class="badge">${a.unread}</span>`:""}</div>
+      </div>`;
+      if (i < s.aliases.length - 1) h += `<div class="row-separator"></div>`;
     }
-    html += `</div></div>`;
+    h += `</div>`;
   }
 
   if (s.recentMessages.length === 0 && s.aliases.length === 0) {
-    html += `<div class="empty">No data yet. Open the inbox to sync.</div>`;
+    h += `<div class="section"><div class="empty muted">No messages</div></div>`;
   }
 
-  html += `</div>`; // end scroll
-
-  // Quick actions
-  html += `
+  // Actions
+  h += `<div class="section">
     <div class="actions">
-      <button class="action-btn primary" data-action="compose">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+      <button class="action-btn" data-action="compose">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
         Compose
       </button>
-      <button class="action-btn" data-action="search">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        Search
-      </button>
-      <button class="action-btn" data-action="refresh" id="refresh-btn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
-      </button>
-    </div>`;
+      <button class="action-btn" data-action="open-inbox">Inbox</button>
+      <button class="action-btn" data-action="quit" style="color:inherit;opacity:0.4">Quit</button>
+    </div>
+  </div>`;
 
-  // Footer
-  html += `
-    <div class="footer">
-      <button class="footer-btn" data-action="open-inbox">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="2,4 12,13 22,4"/></svg>
-        Open inbox
-      </button>
-      <button class="footer-btn quit" data-action="quit">Quit</button>
-    </div>`;
+  panel.innerHTML = h;
 
-  panel.innerHTML = html;
-
-  // Bind click events
   panel.querySelectorAll("[data-action]").forEach(el => {
     el.addEventListener("click", () => {
-      const action = el.dataset.action;
-      if (action === "select-alias") {
-        window.api.selectAlias(el.dataset.handle);
-      } else if (action === "compose") {
-        window.api.compose();
-      } else if (action === "search") {
-        window.api.focusSearch();
-      } else if (action === "open-inbox") {
-        window.api.openInbox();
-      } else if (action === "refresh") {
-        window.api.refresh();
-        el.querySelector("svg").style.animation = "spin 0.6s linear";
-        setTimeout(() => { el.querySelector("svg").style.animation = ""; }, 600);
-      } else if (action === "quit") {
-        window.api.quit();
-      }
+      const a = el.dataset.action;
+      if (a==="select-alias") window.api.selectAlias(el.dataset.handle);
+      else if (a==="compose") window.api.compose();
+      else if (a==="open-inbox") window.api.openInbox();
+      else if (a==="quit") window.api.quit();
     });
   });
 }
 
-// IPC bridge
 window.api = {
   updateState: (s) => { state = { ...state, ...s }; render(); },
-  selectAlias: (handle) => { electronAPI?.selectAliasFromTray?.(handle); },
+  selectAlias: (h) => { electronAPI?.selectAliasFromTray?.(h); },
   compose: () => { electronAPI?.composeFromTray?.(); },
-  focusSearch: () => { electronAPI?.focusSearchFromTray?.(); },
   openInbox: () => { electronAPI?.openInboxFromTray?.(); },
-  refresh: () => { electronAPI?.refreshFromTray?.(); },
   quit: () => { electronAPI?.quitFromTray?.(); },
 };
 
-// Spin animation for refresh
-const style = document.createElement("style");
-style.textContent = "@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}";
-document.head.appendChild(style);
-
-// Initial render
 render();
 </script>
 </body>
