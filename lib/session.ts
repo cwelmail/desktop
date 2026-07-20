@@ -49,22 +49,45 @@ export async function fetchSession(): Promise<SessionState> {
   }
 }
 
-export async function establishSession(accountCode: string): Promise<void> {
+export async function establishSession(
+  accountCode: string,
+  totpCode?: string,
+): Promise<{ totp_required?: boolean; totp_session_token?: string | null }> {
+  const body: Record<string, string> = { account_code: accountCode }
+  if (totpCode) body.totp_code = totpCode
+
   const response = await fetch(`${getApiBase()}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ account_code: accountCode }),
+    body: JSON.stringify(body),
   })
 
   if (!response.ok) {
-    let body: unknown
-    try { body = await response.json() } catch { body = undefined }
-    throw new SessionError("Login failed", response.status, body)
+    let errorBody: unknown
+    try { errorBody = await response.json() } catch { errorBody = undefined }
+    throw new SessionError("Login failed", response.status, errorBody)
   }
 
-  const data = await response.json() as { access_token: string; expires_in: number }
+  const data = await response.json() as {
+    access_token?: string | null
+    totp_required?: boolean
+    totp_session_token?: string | null
+  }
+
+  if (data.totp_required) {
+    return {
+      totp_required: true,
+      totp_session_token: data.totp_session_token ?? null,
+    }
+  }
+
+  if (!data.access_token) {
+    throw new SessionError("Login failed", 500)
+  }
+
   localStorage.setItem("aeri_session_token", data.access_token)
   localStorage.setItem("aerimail_account_code", accountCode)
+  return {}
 }
 
 export async function logoutSession(): Promise<void> {

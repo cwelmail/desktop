@@ -13,6 +13,8 @@ import type {
   BulkMessageRequest,
   CustomDomain,
   DomainListResponse,
+  TotpSetupResponse,
+  TotpStatusResponse,
 } from "@/lib/types/api"
 
 class ApiError extends Error {
@@ -223,6 +225,25 @@ export async function getTotalUnread(): Promise<number> {
 
 export function attachmentDownloadUrl(messageId: string, attachmentId: string): string {
   return `${getApiBaseUrl()}/messages/${messageId}/attachments/${attachmentId}`
+}
+
+export async function setupTotp(): Promise<TotpSetupResponse> {
+  return apiFetch("/totp/setup", { method: "POST" })
+}
+
+export async function enableTotp(code: string): Promise<{ enabled: boolean }> {
+  return apiFetch("/totp/enable", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  })
+}
+
+export async function disableTotp(): Promise<{ enabled: boolean }> {
+  return apiFetch("/totp/disable", { method: "POST" })
+}
+
+export async function getTotpStatus(): Promise<TotpStatusResponse> {
+  return apiFetch("/totp/status")
 }
 
 export { ApiError }

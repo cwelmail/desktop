@@ -2,8 +2,33 @@ export type HealthResponse = { status: string; database?: boolean }
 export type Draft = { id: string; from_alias: string | null; to_address: string | null; cc: string | null; bcc: string | null; subject: string; body: string; body_html: string | null; updated_at: string }
 export type DraftListResponse = { drafts: Draft[] }
 export type CreateAccountResponse = { account_code: string; existing?: boolean }
-export type LoginResponse = { access_token: string; token_type: string; expires_in: number }
-export type Account = { account_id: string; created_at: string; primary_alias: string | null; domain: string | null; plan: "free" | "pro" | "cipher"; pro_until: string | null; can_send: boolean; can_use_secure_link?: boolean }
+export type LoginResponse = {
+  access_token: string | null
+  token_type: string
+  expires_in: number
+  totp_required?: boolean
+  totp_session_token?: string | null
+}
+export type Account = {
+  account_id: string
+  created_at: string
+  primary_alias: string | null
+  domain: string | null
+  plan: "free" | "pro" | "cipher"
+  pro_until: string | null
+  can_send: boolean
+  can_use_secure_link?: boolean
+  totp_enabled?: boolean
+}
+export type TotpSetupResponse = {
+  secret: string
+  qrcode_svg: string
+  recovery_codes: string[]
+}
+export type TotpStatusResponse = {
+  enabled: boolean
+  enabled_at: string | null
+}
 export type BillingStatus = { plan: "free" | "pro" | "cipher"; subscription_plan?: "free" | "pro" | "cipher"; pro_until: string | null; can_send: boolean; can_block_senders?: boolean; can_share_inbox?: boolean; can_use_custom_domains?: boolean; can_use_api?: boolean; can_send_html?: boolean; can_use_secure_link?: boolean; alias_count?: number; max_aliases?: number | null; billing_enabled: boolean; beta_features_enabled?: boolean; pending_invoice: BillingInvoice | null }
 export type BillingInvoice = { invoice_id: string; plan: string; gateway: "monero" | "nowpayments"; status: string; expires_at: string; amount_xmr?: string; payment_id?: string; address?: string; integrated_address?: string | null; payment_uri?: string; amount_usd?: string; pay_address?: string; pay_amount?: string; pay_currency?: string }
 export type BillingVerifyResponse = BillingStatus & { verification?: string; message?: string }

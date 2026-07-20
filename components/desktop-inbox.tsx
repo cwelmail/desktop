@@ -35,6 +35,7 @@ import { ComposePanel, type ReplyContext } from "@/components/compose-modal"
 import { SendToastHost } from "@/components/send-toast"
 import { UpgradeModal } from "@/components/upgrade-modal"
 import { ConfirmModal } from "@/components/confirm-modal"
+import { SecurityModal } from "@/components/security-modal"
 import { Checkbox } from "@/components/ui/checkbox"
 import { KeyboardShortcutsOverlay } from "@/components/keyboard-shortcuts-overlay"
 
@@ -112,6 +113,7 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
   const [filterAttachments, setFilterAttachments] = useState(false)
   const [listDensity, setListDensity] = useState<ListDensity>("comfortable")
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [securityOpen, setSecurityOpen] = useState(false)
   const [burnAliasTarget, setBurnAliasTarget] = useState<DemoAlias | null>(null)
   const [burningAliasId, setBurningAliasId] = useState<string | null>(null)
   const [accountEmail, setAccountEmail] = useState("")
@@ -514,12 +516,20 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
           {totalUnread > 0 && <><div className="h-2.5 w-px bg-border/40" /><span className="text-[10px] text-accent">{totalUnread} unread</span></>}
           <div className="flex-1" />
           {accountEmail && <span className="text-[10px] text-muted-foreground/60">{accountEmail}</span>}
+          <button
+            type="button"
+            onClick={() => setSecurityOpen(true)}
+            className="text-[10px] text-muted-foreground/40 transition-colors hover:text-muted-foreground/80 cursor-pointer"
+          >
+            Security
+          </button>
           <button onClick={() => { localStorage.removeItem("aeri_session_token"); localStorage.removeItem("aerimail_account_code"); if (window.electronAPI?.forceSignIn) window.electronAPI.forceSignIn(); else window.location.href = "/sign-in" }} className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground/80 transition-colors cursor-pointer">Logout</button>
           {plan !== "free" && <span className="rounded-full border border-accent/25 bg-accent/10 px-1.5 py-px text-[8px] uppercase tracking-wide text-accent">{plan}</span>}
         </footer>
       </div>
 
       <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} onUpgraded={() => { setCanSend(true); setUpgradeOpen(false) }} />
+      <SecurityModal open={securityOpen} onClose={() => setSecurityOpen(false)} />
       <ConfirmModal open={Boolean(burnAliasTarget)} onClose={() => setBurnAliasTarget(null)} onConfirm={async () => {
         if (!burnAliasTarget) return; setBurningAliasId(burnAliasTarget.id); setActionError(null)
         try { await burnAlias(burnAliasTarget.id); const burnedHandle = burnAliasTarget.handle; setAliases((prev) => prev.filter((a) => a.id !== burnAliasTarget.id)); if (selectedAlias === burnedHandle) { const remaining = aliases.filter((a) => a.id !== burnAliasTarget.id); setSelectedAlias(remaining[0]?.handle ?? null); setSelectedId(null) } setBurnAliasTarget(null) }
