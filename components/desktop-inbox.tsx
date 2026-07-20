@@ -324,7 +324,7 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
       <div className="flex min-h-0 w-full flex-1 flex-col">
 
         {/* ── Header bar: alias dropdown + tabs + search + compose ── */}
-        <header className="flex shrink-0 items-center gap-2 border-b border-border/50 pl-[72px] pr-3">
+        <header className="flex h-[52px] shrink-0 items-center gap-2 border-b border-border/50 pl-[72px] pr-3">
           <div ref={aliasDropdownRef} className="relative shrink-0">
             <button type="button" onClick={() => setAliasDropdownOpen(!aliasDropdownOpen)} className="flex items-center gap-1.5 rounded-lg px-2 py-2 text-[12px] transition-colors hover:bg-secondary/50">
               <span className="font-mono text-muted-foreground">{activeAliasLabel}</span>

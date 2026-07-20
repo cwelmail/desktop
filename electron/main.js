@@ -153,7 +153,7 @@ function createMainWindow() {
     minWidth: 680,
     minHeight: 480,
     titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 14, y: 14 },
+    trafficLightPosition: { x: 14, y: 18 },
     vibrancy: "under-window",
     visualEffectState: "active",
     backgroundColor: "#09090b",
