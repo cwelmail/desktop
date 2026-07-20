@@ -21,6 +21,7 @@ import {
 } from "@/lib/api"
 import { canBlacklistOnAlias, canSendFromAlias, sendableAliases } from "@/lib/alias-permissions"
 import { BRAND_NAME } from "@/lib/brand"
+import { AeriLogo } from "@/components/aeri-logo"
 import { canSendHtml as planCanSendHtml, canUseSecureLink as planCanUseSecureLink, hasProBenefits } from "@/lib/plan-access"
 import { useRealtime } from "@/lib/use-realtime"
 import type { Message as ApiMessage } from "@/lib/types/api"
@@ -79,7 +80,11 @@ function SenderAvatar({ message }: { message: DemoMessage }) {
   return <span className={`flex size-8 shrink-0 items-center justify-center rounded-full ${color} font-mono text-[11px] font-medium text-white`}>{initial}</span>
 }
 
-function handleAuthFailure(router: ReturnType<typeof useRouter>) { router.replace("/sign-in") }
+function handleAuthFailure(router: ReturnType<typeof useRouter>) {
+  localStorage.removeItem("aeri_session_token")
+  if (window.electronAPI?.forceSignIn) window.electronAPI.forceSignIn()
+  else router.replace("/sign-in")
+}
 
 export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
   const router = useRouter()
@@ -199,14 +204,22 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
     if (typeof window === "undefined") return
     document.title = totalUnread > 0 ? `(${totalUnread}) ${BRAND_NAME}` : BRAND_NAME
     if (window.electronAPI) {
-      window.electronAPI.updateTray({
-        totalUnread,
-        recentMessages: messages.filter((m) => m.unread).slice(0, 6).map((m) => ({
+      const recent = [...messages]
+        .sort((a, b) => {
+          if (a.unread !== b.unread) return a.unread ? -1 : 1
+          return new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
+        })
+        .slice(0, 6)
+        .map((m) => ({
           from: m.from,
           senderName: senderDisplayName(m.from, m.senderName),
           subject: m.subject,
           receivedAt: m.receivedAt,
-        })),
+          unread: m.unread,
+        }))
+      window.electronAPI.updateTray({
+        totalUnread,
+        recentMessages: recent,
         accountEmail,
         plan,
         connected: !realtimeReconnecting,
@@ -490,6 +503,8 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
 
         {/* ── Status bar ── */}
         <footer className="flex shrink-0 items-center gap-3 border-t border-border/50 px-4 py-1.5">
+          <AeriLogo className="h-2.5 w-auto text-muted-foreground/50" />
+          <div className="h-2.5 w-px bg-border/40" />
           <div className="flex items-center gap-1.5">
             <span className={cn("size-1.5 rounded-full", realtimeReconnecting ? "bg-amber-500" : "bg-green-500")} />
             <span className="text-[10px] text-muted-foreground">{realtimeReconnecting ? "Reconnecting…" : "Connected"}</span>

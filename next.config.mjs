@@ -4,6 +4,15 @@ const nextConfig = {
   images: { unoptimized: true },
   poweredByHeader: false,
   output: "export",
+  // Used by `next dev` only — static export ignores rewrites.
+  async rewrites() {
+    return [
+      {
+        source: "/api/v1/:path*",
+        destination: "https://api.aeri.rest/api/v1/:path*",
+      },
+    ]
+  },
   async headers() {
     return [
       {

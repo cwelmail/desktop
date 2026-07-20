@@ -1,4 +1,4 @@
-const API_BASE = "https://api.aeri.rest/api/v1"
+import { getApiBase } from "@/lib/config"
 
 export type UserSession = {
   accountId: string
@@ -22,7 +22,7 @@ export async function fetchSession(): Promise<SessionState> {
   if (!token) return null
 
   try {
-    const response = await fetch(`${API_BASE}/auth/me`, {
+    const response = await fetch(`${getApiBase()}/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) {
@@ -50,7 +50,7 @@ export async function fetchSession(): Promise<SessionState> {
 }
 
 export async function establishSession(accountCode: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/auth/login`, {
+  const response = await fetch(`${getApiBase()}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ account_code: accountCode }),

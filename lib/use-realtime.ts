@@ -1,9 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { getApiBase } from "@/lib/config"
 import { type RealtimeEvent } from "@/lib/realtime"
-
-const API_BASE = "https://api.aeri.rest/api/v1"
 const MAX_RETRIES = 10
 const BASE_RETRY_MS = 3000
 const MAX_RETRY_MS = 60000
@@ -74,7 +73,7 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
 
       abortController = new AbortController()
       try {
-        const res = await fetch(`${API_BASE}/events/stream`, {
+        const res = await fetch(`${getApiBase()}/events/stream`, {
           headers: { Authorization: `Bearer ${token}` },
           signal: abortController.signal,
         })
@@ -89,8 +88,9 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
           retries++
           if (cancelled) return
           if (retries >= MAX_RETRIES) {
-            retries = 0
-            retryTimer = window.setTimeout(connect, BASE_RETRY_MS)
+            console.log("[aeri] SSE gave up after max retries")
+            setConnected(false)
+            setReconnecting(false)
             return
           }
           const delay = Math.min(BASE_RETRY_MS * Math.pow(1.5, retries - 1), MAX_RETRY_MS)
@@ -139,14 +139,15 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
 
       if (cancelled) return
       retries++
-      const token = getToken()
-      if (!token || isTokenExpired(token)) {
+      const currentToken = getToken()
+      if (!currentToken || isTokenExpired(currentToken)) {
         expireSession()
         return
       }
       if (retries >= MAX_RETRIES) {
-        retries = 0
-        retryTimer = window.setTimeout(connect, BASE_RETRY_MS)
+        console.log("[aeri] SSE gave up after max retries")
+        setConnected(false)
+        setReconnecting(false)
         return
       }
       const delay = Math.min(BASE_RETRY_MS * Math.pow(1.5, retries - 1), MAX_RETRY_MS)

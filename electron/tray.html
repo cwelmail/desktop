@@ -244,7 +244,7 @@ function render(){
       const name=m.senderName||m.from?.split("@")[0]||m.from||"";
       h+=`<div class="item clickable" data-action="open-inbox">
         <div class="avatar" style="background:${c}">${esc(ini)}</div>
-        <div class="text"><div class="primary truncate">${esc(name)}</div><div class="muted truncate">${esc(m.subject)}</div></div>
+        <div class="text"><div class="primary truncate" style="${m.unread?"font-weight:600":""}">${esc(name)}</div><div class="muted truncate">${esc(m.subject)}</div></div>
         <div class="right"><span class="dim">${timeAgo(m.receivedAt)}</span></div>
       </div>`;
       if(i<s.recentMessages.length-1)h+=`<div class="row-separator"></div>`;
@@ -253,7 +253,7 @@ function render(){
   }
 
   if(s.recentMessages.length===0){
-    h+=`<div class="section"><div class="empty">No messages</div></div>`;
+    h+=`<div class="section"><div class="empty">${s.totalUnread>0?"No recent messages":"No messages"}</div></div>`;
   }
 
   h+=`<div class="section">

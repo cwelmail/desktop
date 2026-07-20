@@ -4,13 +4,13 @@ import { useEffect, useId, useState } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "motion/react"
 import { Icon } from "@/components/icon"
+import { AeriLogo } from "@/components/aeri-logo"
 import {
   formatAccountCode,
   isValidAccountCode,
   normalizeAccountCode,
   PLACEHOLDER_LOGIN_KEY,
 } from "@/lib/account-code"
-import { BRAND_NAME } from "@/lib/brand"
 import { establishSession, fetchSession, SessionError } from "@/lib/session"
 import { cn } from "@/lib/utils"
 
@@ -59,12 +59,11 @@ export default function OnboardingPage() {
         transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
         style={{ background: "radial-gradient(circle, color-mix(in oklch, var(--accent) 18%, transparent) 0%, transparent 70%)" }} />
       <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: entered ? 1 : 0, y: entered ? 0 : 20, scale: entered ? 1 : 0.98 }} transition={morph} className="relative z-10 w-full max-w-md">
-        <div className="mb-8 inline-flex items-center gap-2.5">
-          <span className="flex size-9 items-center justify-center rounded-lg bg-accent text-accent-foreground"><Icon icon="ph:shield-check-fill" className="size-4" /></span>
-          <span className="text-lg font-semibold tracking-tight">{BRAND_NAME}</span>
+        <div className="mb-8">
+          <AeriLogo className="h-7 w-auto text-foreground" />
         </div>
         <div className="mb-6">
-          <h1 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">Welcome to <span className="font-serif-italic font-normal text-accent">{BRAND_NAME}</span></h1>
+          <h1 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">Welcome</h1>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Enter your 24-digit login key to get started. No password, no email — just the key you saved when you created your account.</p>
         </div>
         <div className="rounded-[1.375rem] p-0.5 bg-background/30 ring-1 ring-border/70">

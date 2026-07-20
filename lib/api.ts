@@ -45,10 +45,10 @@ export function getApiErrorDetail(error: unknown, fallback: string): string {
 
 const SEND_REQUEST_TIMEOUT_MS = 45_000
 
-const API_BASE = "https://api.aeri.rest/api/v1"
+import { getApiBase } from "@/lib/config"
 
 function getApiBaseUrl(): string {
-  return API_BASE
+  return getApiBase()
 }
 
 function getAuthToken(): string | null {
