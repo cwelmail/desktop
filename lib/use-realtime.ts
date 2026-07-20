@@ -79,24 +79,23 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
         source = null
         if (cancelled) return
         retries++
-        if (retries >= MAX_RETRIES) {
-          void checkTokenValid().then((valid) => {
-            if (cancelled) return
-            if (!valid) {
-              localStorage.removeItem("aeri_session_token")
-              setReconnecting(false)
-              window.location.href = "/sign-in"
-              return
-            }
+        void checkTokenValid().then((valid) => {
+          if (cancelled) return
+          if (!valid) {
+            localStorage.removeItem("aeri_session_token")
+            setReconnecting(false)
+            window.location.href = "/sign-in"
+            return
+          }
+          if (retries >= MAX_RETRIES) {
             retries = 0
-            setReconnecting(true)
             retryTimer = window.setTimeout(connect, BASE_RETRY_MS)
-          })
-          return
-        }
-        const delay = Math.min(BASE_RETRY_MS * Math.pow(1.5, retries - 1), MAX_RETRY_MS)
-        setReconnecting(true)
-        retryTimer = window.setTimeout(connect, delay)
+            return
+          }
+          const delay = Math.min(BASE_RETRY_MS * Math.pow(1.5, retries - 1), MAX_RETRY_MS)
+          setReconnecting(true)
+          retryTimer = window.setTimeout(connect, delay)
+        })
       }
     }
 
