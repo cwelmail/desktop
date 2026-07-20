@@ -64,6 +64,13 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
 
     function openSse() {
       if (cancelled) return
+      if (isTokenExpired()) {
+        localStorage.removeItem("aeri_session_token")
+        setConnected(false)
+        setReconnecting(false)
+        window.location.href = "/sign-in"
+        return
+      }
       const token = localStorage.getItem("aeri_session_token")
       if (!token) {
         setConnected(false)
@@ -121,6 +128,13 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
       source?.close()
       source = null
       if (retryTimer) window.clearTimeout(retryTimer)
+      if (isTokenExpired()) {
+        localStorage.removeItem("aeri_session_token")
+        setConnected(false)
+        setReconnecting(false)
+        window.location.href = "/sign-in"
+        return
+      }
       openSse()
     }
 
