@@ -37,8 +37,11 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
     let retryTimer: ReturnType<typeof window.setTimeout> | undefined
     let retries = 0
 
-    function isTokenExpired(): boolean {
-      const token = localStorage.getItem("aeri_session_token")
+    function getToken(): string | null {
+      return localStorage.getItem("aeri_session_token")
+    }
+
+    function isTokenExpired(token: string | null): boolean {
       if (!token) return true
       try {
         const payload = JSON.parse(atob(token.split(".")[1]))
@@ -48,33 +51,18 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
       }
     }
 
-    async function checkTokenValid(): Promise<boolean> {
-      if (isTokenExpired()) return false
-      const token = localStorage.getItem("aeri_session_token")
-      if (!token) return false
-      try {
-        const res = await fetch(`${API_BASE}/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        return res.ok
-      } catch {
-        return true
-      }
+    function expireSession() {
+      localStorage.removeItem("aeri_session_token")
+      setConnected(false)
+      setReconnecting(false)
+      window.location.reload()
     }
 
     function openSse() {
       if (cancelled) return
-      if (isTokenExpired()) {
-        localStorage.removeItem("aeri_session_token")
-        setConnected(false)
-        setReconnecting(false)
-        window.location.href = "/sign-in"
-        return
-      }
-      const token = localStorage.getItem("aeri_session_token")
-      if (!token) {
-        setConnected(false)
-        setReconnecting(false)
+      const token = getToken()
+      if (!token || isTokenExpired(token)) {
+        expireSession()
         return
       }
       const url = `${API_BASE}/events/stream?token=${encodeURIComponent(token)}`
@@ -98,29 +86,19 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
         source = null
         if (cancelled) return
         retries++
-        if (isTokenExpired()) {
-          localStorage.removeItem("aeri_session_token")
-          setReconnecting(false)
-          window.location.href = "/sign-in"
+        const token = getToken()
+        if (!token || isTokenExpired(token)) {
+          expireSession()
           return
         }
-        void checkTokenValid().then((valid) => {
-          if (cancelled) return
-          if (!valid) {
-            localStorage.removeItem("aeri_session_token")
-            setReconnecting(false)
-            window.location.href = "/sign-in"
-            return
-          }
-          if (retries >= MAX_RETRIES) {
-            retries = 0
-            retryTimer = window.setTimeout(connect, BASE_RETRY_MS)
-            return
-          }
-          const delay = Math.min(BASE_RETRY_MS * Math.pow(1.5, retries - 1), MAX_RETRY_MS)
-          setReconnecting(true)
-          retryTimer = window.setTimeout(connect, delay)
-        })
+        if (retries >= MAX_RETRIES) {
+          retries = 0
+          retryTimer = window.setTimeout(connect, BASE_RETRY_MS)
+          return
+        }
+        const delay = Math.min(BASE_RETRY_MS * Math.pow(1.5, retries - 1), MAX_RETRY_MS)
+        setReconnecting(true)
+        retryTimer = window.setTimeout(connect, delay)
       }
     }
 
@@ -128,11 +106,9 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
       source?.close()
       source = null
       if (retryTimer) window.clearTimeout(retryTimer)
-      if (isTokenExpired()) {
-        localStorage.removeItem("aeri_session_token")
-        setConnected(false)
-        setReconnecting(false)
-        window.location.href = "/sign-in"
+      const token = getToken()
+      if (!token || isTokenExpired(token)) {
+        expireSession()
         return
       }
       openSse()
