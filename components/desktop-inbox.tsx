@@ -499,6 +499,7 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
           {totalUnread > 0 && <><div className="h-2.5 w-px bg-border/40" /><span className="text-[10px] text-accent">{totalUnread} unread</span></>}
           <div className="flex-1" />
           {accountEmail && <span className="text-[10px] text-muted-foreground/60">{accountEmail}</span>}
+          <button onClick={() => { localStorage.removeItem("aeri_session_token"); localStorage.removeItem("aerimail_account_code"); if (window.electronAPI?.forceSignIn) window.electronAPI.forceSignIn(); else window.location.href = "/sign-in" }} className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground/80 transition-colors cursor-pointer">Logout</button>
           {plan !== "free" && <span className="rounded-full border border-accent/25 bg-accent/10 px-1.5 py-px text-[8px] uppercase tracking-wide text-accent">{plan}</span>}
         </footer>
       </div>

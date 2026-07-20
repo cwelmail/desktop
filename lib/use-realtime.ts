@@ -53,6 +53,7 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
     }
 
     function expireSession() {
+      console.log("[aeri] session expired, clearing token and navigating to sign-in")
       localStorage.removeItem("aeri_session_token")
       setConnected(false)
       setReconnecting(false)
@@ -60,6 +61,17 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
         window.electronAPI.forceSignIn()
       } else {
         window.location.href = "/sign-in"
+      }
+    }
+
+    async function verifyTokenWithServer(token: string): Promise<boolean> {
+      try {
+        const res = await fetch(`${API_BASE}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        return res.ok
+      } catch {
+        return true
       }
     }
 
@@ -71,9 +83,11 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
         return
       }
       const url = `${API_BASE}/events/stream?token=${encodeURIComponent(token)}`
+      let everOpened = false
       source = new EventSource(url)
 
       source.addEventListener("open", () => {
+        everOpened = true
         setConnected(true)
         setReconnecting(false)
         retries = 0
@@ -94,6 +108,19 @@ export function useRealtime({ onInboxChanged, onAliasesChanged, onBillingChanged
         const token = getToken()
         if (!token || isTokenExpired(token)) {
           expireSession()
+          return
+        }
+        if (!everOpened) {
+          console.log("[aeri] SSE rejected without open, verifying token with /auth/me")
+          void verifyTokenWithServer(token).then((valid) => {
+            if (cancelled) return
+            if (!valid) {
+              expireSession()
+            } else {
+              setReconnecting(true)
+              retryTimer = window.setTimeout(connect, BASE_RETRY_MS)
+            }
+          })
           return
         }
         if (retries >= MAX_RETRIES) {
