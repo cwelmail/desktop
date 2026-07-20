@@ -202,14 +202,19 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
       window.electronAPI.updateTray({
         totalUnread,
         recentMessages: messages.filter((m) => m.unread).slice(0, 6).map((m) => ({
-          from: senderDisplayName(m.from, m.senderName), subject: m.subject,
+          from: m.from,
+          senderName: senderDisplayName(m.from, m.senderName),
+          subject: m.subject,
+          receivedAt: m.receivedAt,
         })),
         aliases: aliases.map((a) => ({ handle: a.handle, unread: a.unread })),
         accountEmail,
         plan,
+        connected: !realtimeReconnecting,
+        reconnecting: realtimeReconnecting,
       })
     }
-  }, [totalUnread, messages, aliases, accountEmail, plan])
+  }, [totalUnread, messages, aliases, accountEmail, plan, realtimeReconnecting])
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -225,7 +230,8 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
     window.electronAPI.onCompose?.(() => { void refreshCanSend().then(() => { setReplyTo(null); setSelectedId(null); setComposeOpen(true) }) })
     window.electronAPI.onFocusSearch?.(() => searchRef.current?.focus())
     window.electronAPI.onSelectAlias?.((handle) => { setSelectedAlias(handle); setView("inbox"); setSelectedId(null) })
-  }, [router, refreshCanSend])
+    window.electronAPI.onRefreshInbox?.(() => { void refreshInbox() })
+  }, [router, refreshCanSend, refreshInbox])
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {

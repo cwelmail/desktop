@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, nativeTheme, protocol, net } = require("electron")
+const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, protocol, net, screen } = require("electron")
 const path = require("path")
 const fs = require("fs")
 
@@ -13,9 +13,18 @@ if (!isDev) {
 }
 
 let mainWindow = null
+let trayPanel = null
 let tray = null
 let isQuitting = false
-let trayState = { totalUnread: 0, recentMessages: [], aliases: [], accountEmail: "", plan: "" }
+let trayState = {
+  totalUnread: 0,
+  recentMessages: [],
+  aliases: [],
+  accountEmail: "",
+  plan: "",
+  connected: true,
+  reconnecting: false,
+}
 
 const TRAY_ICON_SIZE = 22
 
@@ -38,127 +47,6 @@ function createTrayIcon(badge) {
   return nativeImage.createFromBuffer(Buffer.from(svg))
 }
 
-function buildTrayMenu() {
-  const { totalUnread, recentMessages, aliases, accountEmail, plan } = trayState
-  const sections = []
-
-  if (accountEmail) {
-    sections.push({
-      label: accountEmail,
-      enabled: false,
-    })
-    if (plan && plan !== "free") {
-      sections.push({
-        label: `${plan.charAt(0).toUpperCase() + plan.slice(1)} plan`,
-        enabled: false,
-      })
-    }
-    sections.push({ type: "separator" })
-  }
-
-  sections.push({
-    label: totalUnread > 0 ? `  ${totalUnread} unread message${totalUnread === 1 ? "" : "s"}` : "  No unread messages",
-    enabled: false,
-  })
-  sections.push({ type: "separator" })
-
-  if (recentMessages.length > 0) {
-    const recentSubmenu = recentMessages.slice(0, 6).map((msg) => ({
-      label: `${msg.from}  —  ${msg.subject.length > 32 ? msg.subject.slice(0, 32) + "…" : msg.subject}`,
-      enabled: false,
-    }))
-    if (recentMessages.length > 6) {
-      recentSubmenu.push({ label: `…and ${recentMessages.length - 6} more`, enabled: false })
-    }
-    sections.push({
-      label: "Recent",
-      submenu: recentSubmenu,
-    })
-    sections.push({ type: "separator" })
-  }
-
-  if (aliases.length > 0) {
-    const aliasSubmenu = aliases.map((alias) => ({
-      label: `${alias.handle}${alias.unread > 0 ? `  (${alias.unread})` : ""}`,
-      click: () => {
-        if (mainWindow) {
-          mainWindow.show()
-          mainWindow.focus()
-          mainWindow.webContents.send("select-alias", alias.handle)
-        }
-      },
-    }))
-    sections.push({
-      label: "Aliases",
-      submenu: aliasSubmenu,
-    })
-    sections.push({ type: "separator" })
-  }
-
-  sections.push({
-    label: "Compose",
-    accelerator: "CmdOrCtrl+N",
-    click: () => {
-      if (mainWindow) {
-        mainWindow.show()
-        mainWindow.focus()
-        mainWindow.webContents.send("compose")
-      }
-    },
-  })
-
-  sections.push({
-    label: "Search",
-    accelerator: "CmdOrCtrl+K",
-    click: () => {
-      if (mainWindow) {
-        mainWindow.show()
-        mainWindow.focus()
-        mainWindow.webContents.send("focus-search")
-      }
-    },
-  })
-
-  sections.push({ type: "separator" })
-
-  sections.push({
-    label: "Inbox",
-    accelerator: "CmdOrCtrl+Shift+I",
-    click: () => {
-      if (mainWindow) {
-        mainWindow.show()
-        mainWindow.focus()
-        mainWindow.webContents.send("navigate", "/inbox")
-      }
-    },
-  })
-
-  sections.push({
-    label: "Settings",
-    accelerator: "CmdOrCtrl+,",
-    click: () => {
-      if (mainWindow) {
-        mainWindow.show()
-        mainWindow.focus()
-        mainWindow.webContents.send("navigate", "/settings")
-      }
-    },
-  })
-
-  sections.push({ type: "separator" })
-
-  sections.push({
-    label: "Quit aeri",
-    accelerator: "CmdOrCtrl+Q",
-    click: () => {
-      isQuitting = true
-      app.quit()
-    },
-  })
-
-  return Menu.buildFromTemplate(sections)
-}
-
 function updateTray(state) {
   if (!tray) return
   trayState = { ...trayState, ...state }
@@ -170,7 +58,96 @@ function updateTray(state) {
       ? `aeri — ${trayState.totalUnread} unread`
       : "aeri — No unread messages"
   )
-  tray.setContextMenu(buildTrayMenu())
+  if (trayPanel && !trayPanel.isDestroyed()) {
+    trayPanel.webContents.send("tray-state", trayState)
+  }
+}
+
+function createTrayPanel() {
+  if (trayPanel && !trayPanel.isDestroyed()) {
+    trayPanel.focus()
+    return
+  }
+
+  const trayIconBounds = tray.getBounds()
+  const display = screen.getDisplayMatching(trayIconBounds)
+  const screenBounds = display.bounds
+  const panelWidth = 360
+  const panelHeight = 520
+  const margin = 8
+
+  let x = trayIconBounds.x + trayIconBounds.width / 2 - panelWidth / 2
+  let y = trayIconBounds.y + trayIconBounds.height + margin
+
+  if (y + panelHeight > screenBounds.y + screenBounds.height) {
+    y = trayIconBounds.y - panelHeight - margin
+  }
+  if (x + panelWidth > screenBounds.x + screenBounds.width) {
+    x = screenBounds.x + screenBounds.width - panelWidth - margin
+  }
+  if (x < screenBounds.x) {
+    x = screenBounds.x + margin
+  }
+
+  trayPanel = new BrowserWindow({
+    x: Math.round(x),
+    y: Math.round(y),
+    width: panelWidth,
+    height: panelHeight,
+    show: false,
+    frame: false,
+    resizable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    movable: false,
+    focusable: true,
+    hasShadow: true,
+    transparent: true,
+    backgroundColor: "#00000000",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  })
+
+  trayPanel.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+
+  if (isDev) {
+    trayPanel.loadFile(path.join(__dirname, "tray.html"))
+  } else {
+    const outDir = path.join(__dirname, "..", "out")
+    trayPanel.loadFile(path.join(__dirname, "tray.html"))
+  }
+
+  trayPanel.once("ready-to-show", () => {
+    trayPanel.show()
+    trayPanel.webContents.send("tray-state", trayState)
+  })
+
+  trayPanel.on("blur", () => {
+    if (trayPanel && !trayPanel.isDestroyed()) {
+      trayPanel.hide()
+    }
+  })
+
+  trayPanel.on("closed", () => { trayPanel = null })
+}
+
+function closeTrayPanel() {
+  if (trayPanel && !trayPanel.isDestroyed()) {
+    trayPanel.hide()
+    trayPanel.close()
+    trayPanel = null
+  }
+}
+
+function focusMainWindow() {
+  if (mainWindow) {
+    mainWindow.show()
+    mainWindow.focus()
+  }
 }
 
 function createMainWindow() {
@@ -221,19 +198,14 @@ function createMainWindow() {
     mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
       console.error(`[aeri] Failed to load: ${validatedURL} — ${errorCode} ${errorDescription}`)
     })
-
     mainWindow.webContents.on("render-process-gone", (_event, details) => {
       console.error(`[aeri] Renderer crashed: ${details.reason}`, details)
     })
-
     mainWindow.webContents.on("unresponsive", () => {
       console.warn("[aeri] Renderer became unresponsive")
     })
-
     mainWindow.webContents.on("console-message", (_event, level, message) => {
-      if (level >= 2) {
-        console.error(`[aeri:renderer] ${message}`)
-      }
+      if (level >= 2) console.error(`[aeri:renderer] ${message}`)
     })
   }
 }
@@ -316,28 +288,68 @@ app.whenReady().then(() => {
 
   setupMenu()
   createMainWindow()
+
   const icon = createTrayIcon(0)
   tray = new Tray(icon)
   tray.setTitle("")
   tray.setToolTip("aeri — No unread messages")
-  tray.setContextMenu(buildTrayMenu())
 
   tray.on("click", () => {
-    if (mainWindow) {
-      mainWindow.isVisible() ? mainWindow.focus() : mainWindow.show()
+    if (trayPanel && !trayPanel.isDestroyed()) {
+      closeTrayPanel()
+    } else {
+      createTrayPanel()
     }
   })
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
-    else if (mainWindow) mainWindow.show()
+    else focusMainWindow()
   })
 })
 
 app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit() })
 app.on("before-quit", () => { isQuitting = true })
 
+// IPC
 ipcMain.on("update-tray", (_event, state) => updateTray(state))
 ipcMain.handle("get-api-url", () => API_URL)
 ipcMain.handle("get-platform", () => process.platform)
 ipcMain.handle("is-dev", () => isDev)
+
+// Tray panel IPC
+ipcMain.on("tray-select-alias", (_event, handle) => {
+  closeTrayPanel()
+  if (mainWindow) {
+    mainWindow.show()
+    mainWindow.focus()
+    mainWindow.webContents.send("select-alias", handle)
+  }
+})
+
+ipcMain.on("tray-compose", () => {
+  closeTrayPanel()
+  focusMainWindow()
+  if (mainWindow) mainWindow.webContents.send("compose")
+})
+
+ipcMain.on("tray-search", () => {
+  closeTrayPanel()
+  focusMainWindow()
+  if (mainWindow) mainWindow.webContents.send("focus-search")
+})
+
+ipcMain.on("tray-open-inbox", () => {
+  closeTrayPanel()
+  focusMainWindow()
+  if (mainWindow) mainWindow.webContents.send("navigate", "/inbox")
+})
+
+ipcMain.on("tray-refresh", () => {
+  if (mainWindow) mainWindow.webContents.send("refresh-inbox")
+})
+
+ipcMain.on("tray-quit", () => {
+  isQuitting = true
+  app.quit()
+})
