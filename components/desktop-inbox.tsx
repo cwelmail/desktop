@@ -542,6 +542,14 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
     try { await markMessagesRead({ alias: selectedAlias }); setMessages((prev) => prev.map((m) => ({ ...m, unread: false }))); void loadAliases() } catch {}
   }
 
+  const handleCompose = useCallback(() => {
+    void refreshCanSend().then(() => {
+      setReplyTo(null)
+      setSelectedId(null)
+      setComposeOpen(true)
+    })
+  }, [refreshCanSend])
+
   if ((loading || aliasLoading) && messages.length === 0 && aliases.length === 0) {
     return <div className="flex flex-1 items-center justify-center"><div className="size-5 animate-spin rounded-full border-2 border-accent border-t-transparent" /></div>
   }
@@ -554,14 +562,6 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
       </div>
     )
   }
-
-  const handleCompose = useCallback(() => {
-    void refreshCanSend().then(() => {
-      setReplyTo(null)
-      setSelectedId(null)
-      setComposeOpen(true)
-    })
-  }, [refreshCanSend])
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col">
