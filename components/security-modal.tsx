@@ -31,10 +31,12 @@ export function SecurityModal({ open, onClose }: SecurityModalProps) {
   const [statusError, setStatusError] = useState(false)
   const [setupData, setSetupData] = useState<TotpSetupData | null>(null)
   const [code, setCode] = useState("")
+  const [disableCode, setDisableCode] = useState("")
   const [enabling, setEnabling] = useState(false)
   const [disabling, setDisabling] = useState(false)
   const [settingUp, setSettingUp] = useState(false)
   const [showRecovery, setShowRecovery] = useState(false)
+  const [disableConfirmOpen, setDisableConfirmOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const loadStatus = useCallback(async () => {
@@ -54,7 +56,9 @@ export function SecurityModal({ open, onClose }: SecurityModalProps) {
     if (!open) return
     setSetupData(null)
     setCode("")
+    setDisableCode("")
     setShowRecovery(false)
+    setDisableConfirmOpen(false)
     setError(null)
     void loadStatus()
   }, [open, loadStatus])
@@ -62,11 +66,18 @@ export function SecurityModal({ open, onClose }: SecurityModalProps) {
   useEffect(() => {
     if (!open) return
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !enabling && !disabling && !settingUp) onClose()
+      if (event.key === "Escape" && !enabling && !disabling && !settingUp) {
+        if (disableConfirmOpen) {
+          setDisableConfirmOpen(false)
+          setError(null)
+        } else {
+          onClose()
+        }
+      }
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [open, enabling, disabling, settingUp, onClose])
+  }, [open, enabling, disabling, settingUp, disableConfirmOpen, onClose])
 
   async function handleSetup() {
     setError(null)
@@ -99,12 +110,14 @@ export function SecurityModal({ open, onClose }: SecurityModalProps) {
     }
   }
 
-  async function handleDisable() {
+  async function handleDisable(verifyCode: string) {
     setDisabling(true)
     setError(null)
     try {
-      await disableTotp()
+      await disableTotp(verifyCode)
       setStatus({ enabled: false, enabled_at: null })
+      setDisableConfirmOpen(false)
+      setDisableCode("")
     } catch (err) {
       setError(getApiErrorDetail(err, "Could not disable 2FA."))
     } finally {
@@ -177,8 +190,8 @@ export function SecurityModal({ open, onClose }: SecurityModalProps) {
                   status?.enabled ? (
                     <button
                       type="button"
-                      disabled={disabling}
-                      onClick={() => void handleDisable()}
+                      disabled={disabling || disableConfirmOpen}
+                      onClick={() => setDisableConfirmOpen(true)}
                       className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-destructive/30 hover:text-destructive disabled:opacity-50"
                     >
                       <Icon
@@ -274,6 +287,47 @@ export function SecurityModal({ open, onClose }: SecurityModalProps) {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {disableConfirmOpen && (
+                <div className="space-y-2 rounded-xl border border-destructive/20 bg-destructive/[0.03] p-3">
+                  <p className="text-[11px] text-muted-foreground">
+                    Enter your authenticator code to confirm disabling 2FA.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={6}
+                      placeholder="000000"
+                      value={disableCode}
+                      onChange={(e) => setDisableCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      className="flex-1 rounded-md border border-border/60 bg-background px-3 py-1.5 text-center font-mono text-sm tracking-[0.2em] placeholder:text-muted-foreground/40 focus:border-accent focus:outline-none"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      disabled={disableCode.length !== 6 || disabling}
+                      onClick={() => void handleDisable(disableCode)}
+                      className="inline-flex items-center gap-1 rounded-full border border-destructive/30 px-3 py-1.5 text-[11px] text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
+                    >
+                      <Icon
+                        icon={disabling ? "ph:spinner" : "ph:check"}
+                        className={cn("size-3.5", disabling && "animate-spin")}
+                      />
+                      {disabling ? "Disabling…" : "Confirm"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={disabling}
+                      onClick={() => { setDisableConfirmOpen(false); setDisableCode(""); setError(null) }}
+                      className="rounded-full px-2.5 py-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
 

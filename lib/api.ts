@@ -247,8 +247,8 @@ export async function enableTotp(code: string): Promise<{ enabled: boolean }> {
   })
 }
 
-export async function disableTotp(): Promise<{ enabled: boolean }> {
-  return apiFetch("/totp/disable", { method: "POST" })
+export async function disableTotp(code: string): Promise<{ enabled: boolean }> {
+  return apiFetch("/totp/disable", { method: "POST", body: JSON.stringify({ code }) })
 }
 
 export async function getTotpStatus(): Promise<TotpStatusResponse> {
