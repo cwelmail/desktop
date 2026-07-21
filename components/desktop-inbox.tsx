@@ -36,6 +36,8 @@ import { SendToastHost } from "@/components/send-toast"
 import { UpgradeModal } from "@/components/upgrade-modal"
 import { ConfirmModal } from "@/components/confirm-modal"
 import { SecurityModal } from "@/components/security-modal"
+import { UpdateNotification } from "@/components/update-notification"
+import { CreateAliasModal } from "@/components/create-alias-modal"
 import { Checkbox } from "@/components/ui/checkbox"
 import { KeyboardShortcutsOverlay } from "@/components/keyboard-shortcuts-overlay"
 
@@ -114,6 +116,7 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
   const [listDensity, setListDensity] = useState<ListDensity>("comfortable")
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [securityOpen, setSecurityOpen] = useState(false)
+  const [createAliasOpen, setCreateAliasOpen] = useState(false)
   const [burnAliasTarget, setBurnAliasTarget] = useState<DemoAlias | null>(null)
   const [burningAliasId, setBurningAliasId] = useState<string | null>(null)
   const [accountEmail, setAccountEmail] = useState("")
@@ -368,7 +371,17 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
             <AnimatePresence>
               {aliasDropdownOpen && (
                 <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.12 }} className="absolute left-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-xl border border-border/60 bg-popover shadow-xl shadow-black/20">
-                  <div className="border-b border-border/40 px-3 py-2"><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Aliases</p></div>
+                  <div className="border-b border-border/40 px-3 py-2 flex items-center justify-between">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Aliases</p>
+                    <button
+                      type="button"
+                      onClick={() => { setAliasDropdownOpen(false); setCreateAliasOpen(true) }}
+                      className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-[10px] text-muted-foreground transition-colors hover:border-accent/25 hover:text-foreground"
+                    >
+                      <Icon icon="ph:plus" className="size-3" />
+                      New
+                    </button>
+                  </div>
                   <div className="max-h-64 overflow-y-auto p-1">
                     {aliases.map((alias) => {
                       const active = alias.handle === selectedAlias
@@ -550,6 +563,7 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
           <span className="text-[10px] text-muted-foreground">{aliases.length} alias{aliases.length !== 1 ? "es" : ""}</span>
           {totalUnread > 0 && <><div className="h-2.5 w-px bg-border/40" /><span className="text-[10px] text-accent">{totalUnread} unread</span></>}
           <div className="flex-1" />
+          <UpdateNotification />
           {accountEmail && <span className="text-[10px] text-muted-foreground/60">{accountEmail}</span>}
           <button
             type="button"
@@ -565,6 +579,14 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
 
       <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} onUpgraded={() => { setCanSend(true); setUpgradeOpen(false) }} />
       <SecurityModal open={securityOpen} onClose={() => setSecurityOpen(false)} />
+      <CreateAliasModal
+        open={createAliasOpen}
+        onClose={() => setCreateAliasOpen(false)}
+        onCreated={() => { void loadAliases() }}
+        defaultDomain="aeri.rest"
+        canCustomize={plan !== "free"}
+        onUpgrade={() => { setCreateAliasOpen(false); setUpgradeOpen(true) }}
+      />
       <ConfirmModal open={Boolean(burnAliasTarget)} onClose={() => setBurnAliasTarget(null)} onConfirm={async () => {
         if (!burnAliasTarget) return; setBurningAliasId(burnAliasTarget.id); setActionError(null)
         try { await burnAlias(burnAliasTarget.id); const burnedHandle = burnAliasTarget.handle; setAliases((prev) => prev.filter((a) => a.id !== burnAliasTarget.id)); if (selectedAlias === burnedHandle) { const remaining = aliases.filter((a) => a.id !== burnAliasTarget.id); setSelectedAlias(remaining[0]?.handle ?? null); setSelectedId(null) } setBurnAliasTarget(null) }

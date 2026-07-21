@@ -4,6 +4,7 @@ const fs = require("fs")
 
 const isDev = !app.isPackaged
 const API_URL = process.env.API_URL || "https://api.aeri.rest"
+const GITHUB_REPO = process.env.GITHUB_REPO || "anomalyco/aeri"
 const NEXT_PORT = 3000
 
 if (!isDev) {
@@ -220,6 +221,15 @@ function setupMenu() {
       label: "aeri",
       submenu: [
         { role: "about" },
+        {
+          label: "Check for Updates…",
+          click: async () => {
+            const result = await checkForUpdates()
+            if (result && mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send("update-check-result", result)
+            }
+          },
+        },
         { type: "separator" },
         { role: "services" },
         { type: "separator" },
@@ -349,6 +359,8 @@ app.whenReady().then(() => {
     if (!mainWindow || mainWindow.isDestroyed()) createMainWindow()
     else focusMainWindow()
   })
+
+  setTimeout(() => { checkForUpdates() }, 10_000)
 })
 
 app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit() })
@@ -359,6 +371,81 @@ ipcMain.on("update-tray", (_event, state) => updateTray(state))
 ipcMain.handle("get-api-url", () => API_URL)
 ipcMain.handle("get-platform", () => process.platform)
 ipcMain.handle("is-dev", () => isDev)
+ipcMain.handle("get-app-version", () => app.getVersion())
+
+// Update checker
+let updateCheckResult = null
+
+function parseVersion(v) {
+  return v.split(".").map(Number)
+}
+
+function isNewerVersion(latest, current) {
+  const latestParts = parseVersion(latest)
+  const currentParts = parseVersion(current)
+  for (let i = 0; i < Math.max(latestParts.length, currentParts.length); i++) {
+    const l = latestParts[i] || 0
+    const c = currentParts[i] || 0
+    if (l > c) return true
+    if (l < c) return false
+  }
+  return false
+}
+
+async function checkForUpdates() {
+  try {
+    const url = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 15_000)
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
+    })
+    clearTimeout(timeout)
+    if (!response.ok) {
+      console.error(`[aeri] GitHub API returned ${response.status}`)
+      return null
+    }
+    const data = await response.json()
+    const tagName = (data.tag_name || "").replace(/^v/, "")
+    const currentVersion = app.getVersion()
+
+    if (!tagName || !isNewerVersion(tagName, currentVersion)) {
+      updateCheckResult = { currentVersion, latestVersion: tagName, updateAvailable: false, downloadUrl: null, releaseNotes: null, releaseUrl: data.html_url || null }
+      return updateCheckResult
+    }
+
+    const macAsset = (data.assets || []).find(a => /\.dmg$/i.test(a.name))
+    const winAsset = (data.assets || []).find(a => /\.exe$/i.test(a.name))
+    const downloadUrl = process.platform === "darwin"
+      ? (macAsset?.browser_download_url || null)
+      : (winAsset?.browser_download_url || null)
+
+    const result = {
+      currentVersion,
+      latestVersion: tagName,
+      updateAvailable: true,
+      downloadUrl,
+      releaseNotes: data.body || null,
+      releaseUrl: data.html_url || null,
+    }
+    updateCheckResult = result
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("update-available", result)
+    }
+    return result
+  } catch (err) {
+    console.error("[aeri] Update check failed:", err.message)
+    return null
+  }
+}
+
+ipcMain.handle("check-for-updates", async () => {
+  if (updateCheckResult) return updateCheckResult
+  return checkForUpdates()
+})
+
+ipcMain.handle("get-update-result", () => updateCheckResult)
 
 // Tray panel IPC
 ipcMain.on("tray-select-alias", (_event, handle) => {

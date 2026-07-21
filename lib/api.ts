@@ -1,6 +1,7 @@
 import type {
   Account,
   Alias,
+  AliasAvailabilityResponse,
   AliasListResponse,
   Message,
   MessageListResponse,
@@ -216,6 +217,14 @@ export async function createAlias(body: { local_part?: string; domain: string; l
 
 export async function listDomains(): Promise<DomainListResponse> {
   return apiFetch("/domains")
+}
+
+export async function checkAliasAvailability(
+  localPart: string,
+  domain: string,
+): Promise<AliasAvailabilityResponse> {
+  const params = new URLSearchParams({ local_part: localPart, domain })
+  return apiFetch(`/aliases/availability?${params}`)
 }
 
 export async function getTotalUnread(): Promise<number> {

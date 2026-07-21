@@ -27,4 +27,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // Force sign-in navigation from renderer
   forceSignIn: () => ipcRenderer.send("force-sign-in"),
+
+  // Update checker
+  checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
+  getUpdateResult: () => ipcRenderer.invoke("get-update-result"),
+  getAppVersion: () => ipcRenderer.invoke("get-app-version"),
+  onUpdateAvailable: (callback) => ipcRenderer.on("update-available", (_event, result) => callback(result)),
+  onUpdateCheckResult: (callback) => ipcRenderer.on("update-check-result", (_event, result) => callback(result)),
 })

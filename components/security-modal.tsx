@@ -28,6 +28,7 @@ export function SecurityModal({ open, onClose }: SecurityModalProps) {
   const reduced = useReducedMotion()
   const [status, setStatus] = useState<{ enabled: boolean; enabled_at: string | null } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [statusError, setStatusError] = useState(false)
   const [setupData, setSetupData] = useState<TotpSetupData | null>(null)
   const [code, setCode] = useState("")
   const [enabling, setEnabling] = useState(false)
@@ -38,10 +39,12 @@ export function SecurityModal({ open, onClose }: SecurityModalProps) {
 
   const loadStatus = useCallback(async () => {
     setLoading(true)
+    setStatusError(false)
     try {
       setStatus(await getTotpStatus())
     } catch {
       setStatus(null)
+      setStatusError(true)
     } finally {
       setLoading(false)
     }
@@ -163,12 +166,14 @@ export function SecurityModal({ open, onClose }: SecurityModalProps) {
                   <p className="text-[11px] text-muted-foreground">
                     {loading
                       ? "Loading…"
-                      : status?.enabled
-                        ? "Enabled — required at sign-in"
-                        : "Add an extra layer of security"}
+                      : statusError
+                        ? "Could not load status."
+                        : status?.enabled
+                          ? "Enabled — required at sign-in"
+                          : "Add an extra layer of security"}
                   </p>
                 </div>
-                {!loading && (
+                {!loading && !statusError && (
                   status?.enabled ? (
                     <button
                       type="button"
@@ -196,6 +201,16 @@ export function SecurityModal({ open, onClose }: SecurityModalProps) {
                       {settingUp ? "Preparing…" : "Set up"}
                     </button>
                   )
+                )}
+                {!loading && statusError && (
+                  <button
+                    type="button"
+                    onClick={() => void loadStatus()}
+                    className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-accent/25 hover:text-foreground"
+                  >
+                    <Icon icon="ph:arrow-clockwise" className="size-3.5" />
+                    Retry
+                  </button>
                 )}
               </div>
 
