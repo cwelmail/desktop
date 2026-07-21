@@ -223,7 +223,22 @@ function setupMenu() {
       ],
     },
     {
-      label: "Edit",
+      label: "message",
+      submenu: [
+        {
+          label: "new message",
+          accelerator: "CmdOrCtrl+N",
+          click: () => {
+            focusMainWindow()
+            if (mainWindow) mainWindow.webContents.send("compose")
+          },
+        },
+        { type: "separator" },
+        { role: "close" },
+      ],
+    },
+    {
+      label: "edit",
       submenu: [
         { role: "undo" },
         { role: "redo" },
@@ -236,8 +251,25 @@ function setupMenu() {
       ],
     },
     {
-      label: "View",
+      label: "view",
       submenu: [
+        {
+          label: "inbox",
+          accelerator: "CmdOrCtrl+1",
+          click: () => {
+            focusMainWindow()
+            if (mainWindow) mainWindow.webContents.send("navigate", "/inbox")
+          },
+        },
+        {
+          label: "sent",
+          accelerator: "CmdOrCtrl+2",
+          click: () => {
+            focusMainWindow()
+            if (mainWindow) mainWindow.webContents.send("navigate", "/inbox")
+          },
+        },
+        { type: "separator" },
         { role: "reload" },
         { role: "forceReload" },
         { role: "toggleDevTools" },
@@ -250,7 +282,7 @@ function setupMenu() {
       ],
     },
     {
-      label: "Window",
+      label: "window",
       submenu: [
         { role: "minimize" },
         { role: "zoom" },
