@@ -6,7 +6,7 @@ Built with Electron + Next.js + React 19 + Tailwind CSS.
 
 ## Install
 
-Download the latest `.dmg` from [Releases](https://github.com/cwelmail/desktop/releases) and drag **aeri** into Applications.
+Download the latest `.dmg` from [Releases](https://github.com/aerirest/desktop/releases) and drag **aeri** into Applications.
 
 If macOS says the app is **damaged** (unsigned build / Gatekeeper quarantine), clear the quarantine flag once:
 
@@ -53,4 +53,4 @@ build/             macOS entitlements for packaging
 
 ## License
 
-Private — [cwelmail](https://github.com/cwelmail)
+Private — [cwelmail](https://github.com/aerirest)
