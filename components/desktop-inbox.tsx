@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence, LayoutGroup } from "motion/react"
 import { Icon } from "@/components/icon"
@@ -89,6 +89,183 @@ function handleAuthFailure(router: ReturnType<typeof useRouter>) {
   else router.replace("/sign-in")
 }
 
+/* ─── Memoized message list item ─── */
+
+interface MessageListItemProps {
+  message: DemoMessage
+  active: boolean
+  selected: boolean
+  showCheckbox: boolean
+  listDensity: ListDensity
+  onOpen: (message: DemoMessage) => void
+  onToggleSelect: (id: string) => void
+}
+
+const MessageListItem = memo(function MessageListItem({ message, active, selected, showCheckbox, listDensity, onOpen, onToggleSelect }: MessageListItemProps) {
+  const unread = message.unread
+  const starred = Boolean(message.starred)
+  return (
+    <li className="group border-b border-border/30 last:border-b-0">
+      <div className={cn("flex w-full items-start gap-2 px-2 text-left transition-colors", active ? "bg-secondary/40" : "hover:bg-secondary/20", listDensity === "compact" ? "py-2" : "py-3")}>
+        <Checkbox checked={selected} onCheckedChange={() => onToggleSelect(message.id)} className={cn("mt-2.5 opacity-0 transition-opacity group-hover:opacity-100", (selected || showCheckbox) && "opacity-100")} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} />
+        <button type="button" onClick={() => onOpen(message)} className="flex min-w-0 flex-1 gap-3 pr-2 text-left">
+          <SenderAvatar message={message} />
+          <span className="min-w-0 flex-1">
+            <span className="flex items-baseline justify-between gap-2">
+              <span className={cn("truncate text-[13px]", unread ? "font-medium text-foreground" : "text-muted-foreground")}>
+                {message.direction === "sent" ? `To: ${message.to ?? message.from}` : senderDisplayName(message.from, message.senderName)}
+              </span>
+              <span className="flex shrink-0 items-center gap-1.5">
+                {starred && <Icon icon="ph:star-fill" className="size-2.5 text-accent" />}
+                <span className="text-[10px] tabular-nums text-muted-foreground">{formatMessageListTime(message.receivedAt)}</span>
+              </span>
+            </span>
+            <span className={cn("mt-0.5 block truncate text-[13px]", unread ? "text-foreground" : "text-muted-foreground/90")}>{message.subject}</span>
+            <span className="mt-0.5 flex items-center gap-2">
+              {message.deliveryStatus === "pending" && <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-px text-[9px] uppercase text-amber-600">Pending</span>}
+              {message.deliveryStatus === "failed" && <span className="rounded-full border border-destructive/30 bg-destructive/10 px-1.5 py-px text-[9px] uppercase text-destructive">Failed</span>}
+              {message.hasAttachments && <Icon icon="ph:paperclip" className="size-2.5 text-muted-foreground/50" />}
+              <span className="block truncate text-[11px] text-muted-foreground/70">{message.preview}</span>
+            </span>
+          </span>
+        </button>
+      </div>
+    </li>
+  )
+})
+
+/* ─── Alias Dropdown ─── */
+
+interface AliasDropdownProps {
+  aliases: DemoAlias[]
+  selectedAlias: string | null
+  activeAliasLabel: string
+  plan: string
+  view: InboxView
+  onSelect: (handle: string) => void
+  onCreateNew: () => void
+  onUpgrade: () => void
+}
+
+function AliasDropdown({ aliases, selectedAlias, activeAliasLabel, plan, view, onSelect, onCreateNew, onUpgrade }: AliasDropdownProps) {
+  const [open, setOpen] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [])
+
+  const handleCopy = useCallback(async (e: React.MouseEvent, handle: string, id: string) => {
+    e.stopPropagation()
+    try {
+      await navigator.clipboard.writeText(handle)
+      setCopiedId(id)
+      window.setTimeout(() => setCopiedId(null), 1600)
+    } catch { /* ignore */ }
+  }, [])
+
+  const handleSelect = useCallback((handle: string) => {
+    onSelect(handle)
+    setOpen(false)
+  }, [onSelect])
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button type="button" onClick={() => setOpen(!open)} className="flex items-center gap-1.5 rounded-lg px-2 py-2 text-[12px] transition-colors hover:bg-secondary/50">
+        <span className="font-mono text-muted-foreground">{activeAliasLabel}</span>
+        <Icon icon={open ? "ph:caret-up" : "ph:caret-down"} className="size-3 text-muted-foreground/60" />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.12 }} className="absolute left-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-xl border border-border/60 bg-popover shadow-xl shadow-black/20">
+            <div className="border-b border-border/40 px-3 py-2 flex items-center justify-between">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Aliases</p>
+              <button
+                type="button"
+                onClick={() => { setOpen(false); onCreateNew() }}
+                className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-[10px] text-muted-foreground transition-colors hover:border-accent/25 hover:text-foreground"
+              >
+                <Icon icon="ph:plus" className="size-3" />
+                New
+              </button>
+            </div>
+            <div className="max-h-64 overflow-y-auto p-1">
+              {aliases.map((alias) => {
+                const active = alias.handle === selectedAlias
+                const local = alias.handle.split("@")[0]
+                return (
+                  <div key={alias.id} className="group/alias flex w-full items-center gap-0.5">
+                    <button type="button" onClick={() => handleSelect(alias.handle)}
+                      className={cn("flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12px] transition-colors", active ? "bg-secondary/60 text-foreground" : "text-muted-foreground hover:bg-secondary/30 hover:text-foreground")}>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate font-mono text-[11px]">{local}</span>
+                        {alias.shared && <span className="shrink-0 rounded-full border border-accent/25 bg-accent/10 px-1.5 py-px text-[8px] uppercase tracking-wide text-accent">Shared</span>}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        {alias.unread > 0 && <span className="font-mono text-[10px] text-accent">{alias.unread}</span>}
+                        {active && <Icon icon="ph:check" className="size-3 text-accent" />}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleCopy(e, alias.handle, alias.id)}
+                      className="shrink-0 rounded-md p-1 text-muted-foreground/40 opacity-0 transition-opacity hover:bg-secondary/50 hover:text-foreground group-hover/alias:opacity-100"
+                      title="Copy address"
+                    >
+                      <Icon icon={copiedId === alias.id ? "ph:check" : "ph:copy"} className="size-3" />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+/* ─── Status Footer ─── */
+
+interface StatusFooterProps {
+  realtimeReconnecting: boolean
+  aliasesCount: number
+  totalUnread: number
+  accountEmail: string
+  plan: string
+  onSecurity: () => void
+  onLogout: () => void
+}
+
+const StatusFooter = memo(function StatusFooter({ realtimeReconnecting, aliasesCount, totalUnread, accountEmail, plan, onSecurity, onLogout }: StatusFooterProps) {
+  return (
+    <footer className="flex shrink-0 items-center gap-3 border-t border-border/50 px-4 py-1.5">
+      <AeriLogo className="h-2.5 w-auto text-muted-foreground/50" />
+      <div className="h-2.5 w-px bg-border/40" />
+      <div className="flex items-center gap-1.5">
+        <span className={cn("size-1.5 rounded-full", realtimeReconnecting ? "bg-amber-500" : "bg-green-500")} />
+        <span className="text-[10px] text-muted-foreground">{realtimeReconnecting ? "Reconnecting…" : "Connected"}</span>
+      </div>
+      <div className="h-2.5 w-px bg-border/40" />
+      <span className="text-[10px] text-muted-foreground">{aliasesCount} alias{aliasesCount !== 1 ? "es" : ""}</span>
+      {totalUnread > 0 && <><div className="h-2.5 w-px bg-border/40" /><span className="text-[10px] text-accent">{totalUnread} unread</span></>}
+      <div className="flex-1" />
+      <UpdateNotification />
+      {accountEmail && <span className="text-[10px] text-muted-foreground/60">{accountEmail}</span>}
+      <button type="button" onClick={onSecurity} className="text-[10px] text-muted-foreground/40 transition-colors hover:text-muted-foreground/80 cursor-pointer">Security</button>
+      <button onClick={onLogout} className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground/80 transition-colors cursor-pointer">Logout</button>
+      {plan !== "free" && <span className="rounded-full border border-accent/25 bg-accent/10 px-1.5 py-px text-[8px] uppercase tracking-wide text-accent">{plan}</span>}
+    </footer>
+  )
+})
+
+/* ─── Main Inbox ─── */
+
 export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
   const router = useRouter()
   const [aliases, setAliases] = useState<DemoAlias[]>([])
@@ -97,6 +274,7 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
   const [selectedAlias, setSelectedAlias] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [loading, setLoading] = useState(true)
   const [aliasLoading, setAliasLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -121,11 +299,11 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
   const [burningAliasId, setBurningAliasId] = useState<string | null>(null)
   const [accountEmail, setAccountEmail] = useState("")
   const [plan, setPlan] = useState("free")
-  const [aliasDropdownOpen, setAliasDropdownOpen] = useState(false)
   const [isWin32, setIsWin32] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const messagesLoadEpochRef = useRef(0)
-  const aliasDropdownRef = useRef<HTMLDivElement>(null)
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
   const messagesRef = useRef(messages)
   messagesRef.current = messages
 
@@ -150,10 +328,10 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
 
   const loadMessages = useCallback(async () => {
     const epoch = ++messagesLoadEpochRef.current
-    const data = await listMessages({ view, alias: selectedAlias || undefined, search: search.trim() || undefined, unread: filterUnread || undefined, has_attachment: filterAttachments || undefined })
+    const data = await listMessages({ view, alias: selectedAlias || undefined, search: debouncedSearch.trim() || undefined, unread: filterUnread || undefined, has_attachment: filterAttachments || undefined })
     if (epoch !== messagesLoadEpochRef.current) return
     setMessages(data.messages.map(toDemoMessage))
-  }, [view, selectedAlias, search, filterUnread, filterAttachments])
+  }, [view, selectedAlias, debouncedSearch, filterUnread, filterAttachments])
 
   const refreshInbox = useCallback(async () => {
     setRefreshing(true)
@@ -207,52 +385,61 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
     return () => { cancelled = true }
   }, [loadMessages, router])
 
-  const selected = messages.find((m) => m.id === selectedId) ?? null
-  const totalUnread = aliases.reduce((sum, a) => sum + a.unread, 0)
+  const selected = useMemo(() => messages.find((m) => m.id === selectedId) ?? null, [messages, selectedId])
+  const totalUnread = useMemo(() => aliases.reduce((sum, a) => sum + a.unread, 0), [aliases])
   const activeAliasMeta = aliases.find((a) => a.handle === selectedAlias) ?? aliases[0] ?? null
   const effectiveCanSend = activeAliasMeta ? canSendFromAlias(activeAliasMeta, canSend) : canSend
-  const sendableFrom = sendableAliases(aliases, canSend).map((a) => a.handle)
+  const sendableFrom = useMemo(() => sendableAliases(aliases, canSend).map((a) => a.handle), [aliases, canSend])
   const activeAliasLabel = selectedAlias ?? `${primaryAlias}@${domain}`
 
   const showUpgrade = useCallback(() => { setComposeOpen(false); setUpgradeOpen(true) }, [])
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem("aeri_session_token")
+    localStorage.removeItem("aerimail_account_code")
+    if (window.electronAPI?.forceSignIn) window.electronAPI.forceSignIn()
+    else window.location.href = "/sign-in"
+  }, [])
+
+  const handleSelectAlias = useCallback((handle: string) => {
+    setSelectedAlias(handle)
+    setSelectedId(null)
+    setView("inbox")
+  }, [])
+
+  /* ─── Tray update with memoized data ─── */
+
+  const trayData = useMemo(() => {
+    const recent = [...messages]
+      .sort((a, b) => {
+        if (a.unread !== b.unread) return a.unread ? -1 : 1
+        return new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
+      })
+      .slice(0, 6)
+      .map((m) => ({
+        id: m.id, alias: m.alias, from: m.from,
+        senderName: senderDisplayName(m.from, m.senderName),
+        subject: m.subject, receivedAt: m.receivedAt, unread: m.unread,
+      }))
+    return { totalUnread, recent, accountEmail, plan, connected: !realtimeReconnecting, reconnecting: realtimeReconnecting }
+  }, [messages, totalUnread, accountEmail, plan, realtimeReconnecting])
 
   useEffect(() => {
     if (typeof window === "undefined") return
     document.title = totalUnread > 0 ? `(${totalUnread}) ${BRAND_NAME}` : BRAND_NAME
     if (window.electronAPI) {
-      const recent = [...messages]
-        .sort((a, b) => {
-          if (a.unread !== b.unread) return a.unread ? -1 : 1
-          return new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
-        })
-        .slice(0, 6)
-        .map((m) => ({
-          id: m.id,
-          alias: m.alias,
-          from: m.from,
-          senderName: senderDisplayName(m.from, m.senderName),
-          subject: m.subject,
-          receivedAt: m.receivedAt,
-          unread: m.unread,
-        }))
       window.electronAPI.updateTray({
-        totalUnread,
-        recentMessages: recent,
-        accountEmail,
-        plan,
-        connected: !realtimeReconnecting,
-        reconnecting: realtimeReconnecting,
+        totalUnread: trayData.totalUnread,
+        recentMessages: trayData.recent,
+        accountEmail: trayData.accountEmail,
+        plan: trayData.plan,
+        connected: trayData.connected,
+        reconnecting: trayData.reconnecting,
       })
     }
-  }, [totalUnread, messages, aliases, accountEmail, plan, realtimeReconnecting])
+  }, [trayData, totalUnread])
 
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (aliasDropdownRef.current && !aliasDropdownRef.current.contains(e.target as Node)) setAliasDropdownOpen(false)
-    }
-    document.addEventListener("mousedown", handleClick)
-    return () => document.removeEventListener("mousedown", handleClick)
-  }, [])
+  /* ─── IPC listeners ─── */
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.electronAPI) return
@@ -260,15 +447,16 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
     window.electronAPI.onCompose?.(() => { void refreshCanSend().then(() => { setReplyTo(null); setSelectedId(null); setComposeOpen(true) }) })
     window.electronAPI.onFocusSearch?.(() => searchRef.current?.focus())
     window.electronAPI.onSelectAlias?.((handle) => { setSelectedAlias(handle); setView("inbox"); setSelectedId(null) })
-    window.electronAPI.onOpenMessage?.((payload) => {
-      const messageId = typeof payload === "string" ? payload : payload?.id
-      const alias = typeof payload === "object" && payload ? payload.alias : undefined
+    window.electronAPI.onOpenMessage?.((payload: string | Record<string, unknown>) => {
+      const messageId = typeof payload === "string" ? payload : ((payload as Record<string, unknown>).id as string)
+      const alias = typeof payload === "object" && payload ? (payload as Record<string, unknown>).alias as string | undefined : undefined
       if (!messageId) return
       setComposeOpen(false)
       setReplyTo(null)
       setFilterUnread(false)
       setFilterAttachments(false)
       setSearch("")
+      setDebouncedSearch("")
       setView("inbox")
       if (alias) setSelectedAlias(alias)
       setSelectedId(messageId)
@@ -285,6 +473,13 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
     window.electronAPI.onRefreshInbox?.(() => { void refreshInbox() })
   }, [router, refreshCanSend, refreshInbox, loadAliases])
 
+  /* ─── Keyboard handler with stable refs ─── */
+
+  const openMessageRef = useRef<(message: DemoMessage) => void>(() => {})
+  openMessageRef.current = openMessage
+  const archiveMessageRef = useRef<(id: string) => void>(() => {})
+  archiveMessageRef.current = archiveMessage
+
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null
@@ -292,21 +487,24 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
       if (typing || composeOpen) return
       if (event.key === "?") { event.preventDefault(); setShortcutsOpen(true); return }
       if (event.key === "/") { event.preventDefault(); searchRef.current?.focus(); return }
-      const active = messages.find((m) => m.id === selectedId)
+      const msgs = messagesRef.current
+      const active = msgs.find((m) => m.id === selectedId)
       if (!active) return
       if (event.key === "j" || event.key === "k") {
         event.preventDefault()
-        const i = messages.findIndex((m) => m.id === active.id)
-        const next = messages[event.key === "j" ? i + 1 : i - 1]
-        if (next) void openMessage(next)
+        const i = msgs.findIndex((m) => m.id === active.id)
+        const next = msgs[event.key === "j" ? i + 1 : i - 1]
+        if (next) void openMessageRef.current(next)
         return
       }
       if (event.key === "r") { event.preventDefault(); setReplyTo(buildReplyContext(active)); setComposeOpen(true); return }
-      if (event.key === "e" && view !== "trash") { event.preventDefault(); void archiveMessage(active.id) }
+      if (event.key === "e" && view !== "trash") { event.preventDefault(); void archiveMessageRef.current(active.id) }
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [composeOpen, messages, selectedId, view])
+  }, [composeOpen, selectedId, view])
+
+  /* ─── Actions ─── */
 
   function toggleSelected(id: string) {
     setSelectedIds((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
@@ -357,56 +555,32 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
     )
   }
 
+  const handleCompose = useCallback(() => {
+    void refreshCanSend().then(() => {
+      setReplyTo(null)
+      setSelectedId(null)
+      setComposeOpen(true)
+    })
+  }, [refreshCanSend])
+
   return (
-    <LayoutGroup id="desktop-inbox">
-      <div className="flex min-h-0 w-full flex-1 flex-col">
+    <div className="flex min-h-0 w-full flex-1 flex-col">
 
-        {/* ── Header bar: alias dropdown + tabs + search + compose ── */}
-        <header className="flex h-[52px] shrink-0 items-center gap-2 border-b border-border/50 pl-[var(--header-left-pad,72px)] pr-3">
-          <div ref={aliasDropdownRef} className="relative shrink-0">
-            <button type="button" onClick={() => setAliasDropdownOpen(!aliasDropdownOpen)} className="flex items-center gap-1.5 rounded-lg px-2 py-2 text-[12px] transition-colors hover:bg-secondary/50">
-              <span className="font-mono text-muted-foreground">{activeAliasLabel}</span>
-              <Icon icon={aliasDropdownOpen ? "ph:caret-up" : "ph:caret-down"} className="size-3 text-muted-foreground/60" />
-            </button>
-            <AnimatePresence>
-              {aliasDropdownOpen && (
-                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.12 }} className="absolute left-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-xl border border-border/60 bg-popover shadow-xl shadow-black/20">
-                  <div className="border-b border-border/40 px-3 py-2 flex items-center justify-between">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Aliases</p>
-                    <button
-                      type="button"
-                      onClick={() => { setAliasDropdownOpen(false); setCreateAliasOpen(true) }}
-                      className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-[10px] text-muted-foreground transition-colors hover:border-accent/25 hover:text-foreground"
-                    >
-                      <Icon icon="ph:plus" className="size-3" />
-                      New
-                    </button>
-                  </div>
-                  <div className="max-h-64 overflow-y-auto p-1">
-                    {aliases.map((alias) => {
-                      const active = alias.handle === selectedAlias
-                      const local = alias.handle.split("@")[0]
-                      return (
-                        <button key={alias.id} type="button" onClick={() => { setSelectedAlias(alias.handle); setSelectedId(null); setAliasDropdownOpen(false); if (view === "archive" && alias.unread === 0) setView("inbox") }}
-                          className={cn("flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12px] transition-colors", active ? "bg-secondary/60 text-foreground" : "text-muted-foreground hover:bg-secondary/30 hover:text-foreground")}>
-                          <span className="flex min-w-0 items-center gap-2">
-                            <span className="truncate font-mono text-[11px]">{local}</span>
-                            {alias.shared && <span className="shrink-0 rounded-full border border-accent/25 bg-accent/10 px-1.5 py-px text-[8px] uppercase tracking-wide text-accent">Shared</span>}
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            {alias.unread > 0 && <span className="font-mono text-[10px] text-accent">{alias.unread}</span>}
-                            {active && <Icon icon="ph:check" className="size-3 text-accent" />}
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+      {/* ── Header bar: alias dropdown + tabs + search + compose ── */}
+      <header className="flex h-[52px] shrink-0 items-center gap-2 border-b border-border/50 pl-[var(--header-left-pad,72px)] pr-3">
+        <AliasDropdown
+          aliases={aliases}
+          selectedAlias={selectedAlias}
+          activeAliasLabel={activeAliasLabel}
+          plan={plan}
+          view={view}
+          onSelect={handleSelectAlias}
+          onCreateNew={() => setCreateAliasOpen(true)}
+          onUpgrade={() => { setCreateAliasOpen(false); setUpgradeOpen(true) }}
+        />
 
-          <nav className="flex items-center gap-0.5">
+        <nav className="flex items-center gap-0.5">
+          <LayoutGroup id="desktop-view-tabs">
             {VIEWS.map((v) => (
               <button key={v.id} type="button" onClick={() => { setView(v.id); setSelectedId(null) }}
                 className={cn("relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] transition-colors", view === v.id ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
@@ -415,167 +589,141 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
                 <span className="relative hidden sm:inline">{v.label}</span>
               </button>
             ))}
-          </nav>
+          </LayoutGroup>
+        </nav>
 
-          <div className="flex-1" />
+        <div className="flex-1" />
 
-          <label className="relative flex min-w-0 items-center gap-2 rounded-full border border-border/60 bg-background/50 px-3 py-1.5 focus-within:border-accent/30">
-            <Icon icon="ph:magnifying-glass" className="size-3.5 shrink-0 text-muted-foreground" />
-            <input ref={searchRef} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search" className="w-28 bg-transparent text-[12px] outline-none placeholder:text-muted-foreground/50 sm:w-40" />
-            {search && <button type="button" onClick={() => setSearch("")} className="text-muted-foreground hover:text-foreground"><Icon icon="ph:x" className="size-3" /></button>}
-          </label>
+        <label className="relative flex min-w-0 items-center gap-2 rounded-full border border-border/60 bg-background/50 px-3 py-1.5 focus-within:border-accent/30">
+          <Icon icon="ph:magnifying-glass" className="size-3.5 shrink-0 text-muted-foreground" />
+          <input
+            ref={searchRef}
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              clearTimeout(searchTimerRef.current)
+              searchTimerRef.current = setTimeout(() => setDebouncedSearch(e.target.value), 300)
+            }}
+            placeholder="Search"
+            className="w-28 bg-transparent text-[12px] outline-none placeholder:text-muted-foreground/50 sm:w-40"
+          />
+          {search && <button type="button" onClick={() => { setSearch(""); setDebouncedSearch("") }} className="text-muted-foreground hover:text-foreground"><Icon icon="ph:x" className="size-3" /></button>}
+        </label>
 
-          <button type="button" onClick={() => { void refreshCanSend().then(() => { setReplyTo(null); setSelectedId(null); setComposeOpen(true) }) }} disabled={sendableFrom.length === 0}
-            className="flex shrink-0 items-center gap-1.5 rounded-full border border-accent/30 bg-accent/[0.1] px-3 py-1.5 text-[12px] font-medium text-accent transition-colors hover:bg-accent/[0.16] disabled:cursor-not-allowed disabled:opacity-40">
-            <Icon icon="ph:pencil-simple-line" className="size-3.5" />
-            <span className="hidden sm:inline">Compose</span>
-          </button>
+        <button type="button" onClick={handleCompose} disabled={sendableFrom.length === 0}
+          className="flex shrink-0 items-center gap-1.5 rounded-full border border-accent/30 bg-accent/[0.1] px-3 py-1.5 text-[12px] font-medium text-accent transition-colors hover:bg-accent/[0.16] disabled:cursor-not-allowed disabled:opacity-40">
+          <Icon icon="ph:pencil-simple-line" className="size-3.5" />
+          <span className="hidden sm:inline">Compose</span>
+        </button>
 
-          <button type="button" onClick={() => void refreshInbox()} disabled={refreshing} className="shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50" title="Refresh">
-            <Icon icon="ph:arrow-clockwise" className={cn("size-3.5", refreshing && "animate-spin")} />
-          </button>
-        </header>
+        <button type="button" onClick={() => void refreshInbox()} disabled={refreshing} className="shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50" title="Refresh">
+          <Icon icon="ph:arrow-clockwise" className={cn("size-3.5", refreshing && "animate-spin")} />
+        </button>
+      </header>
 
-        {/* ── Toolbar: filters + alias info + bulk actions ── */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-border/30 px-4 py-2">
-          <button type="button" onClick={() => setFilterUnread((c) => !c)} className={cn("rounded-full border px-2.5 py-0.5 text-[10px]", filterUnread ? "border-accent/40 bg-accent/10 text-accent" : "border-border/60 text-muted-foreground")}>Unread</button>
-          <button type="button" onClick={() => setFilterAttachments((c) => !c)} className={cn("rounded-full border px-2.5 py-0.5 text-[10px]", filterAttachments ? "border-accent/40 bg-accent/10 text-accent" : "border-border/60 text-muted-foreground")}>Attachments</button>
-          <div className="flex-1" />
-          {view === "inbox" && <button type="button" onClick={() => void markAllRead()} className="text-[10px] text-muted-foreground transition-colors hover:text-foreground">Mark all read</button>}
-          {view === "trash" && messages.length > 0 && <button type="button" onClick={async () => { try { await emptyTrash(); setMessages([]); setSelectedId(null); void loadAliases() } catch {} }} className="text-[10px] text-destructive transition-colors hover:text-destructive">Empty trash</button>}
-          {selectedIds.size > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-muted-foreground">{selectedIds.size} selected</span>
-              <button type="button" onClick={async () => { const ids = [...selectedIds]; try { await bulkUpdateMessages({ message_ids: ids, read: true }); setSelectedIds(new Set()); void loadMessages(); void loadAliases() } catch {} }} className="text-[10px] text-muted-foreground hover:text-foreground">Mark read</button>
-              <button type="button" onClick={async () => { const ids = [...selectedIds]; try { await bulkUpdateMessages({ message_ids: ids, starred: true }); setSelectedIds(new Set()); void loadMessages(); void loadAliases() } catch {} }} className="text-[10px] text-muted-foreground hover:text-foreground">Star</button>
-              {view === "trash" ? <button type="button" onClick={async () => { const ids = [...selectedIds]; try { await bulkUpdateMessages({ message_ids: ids, restore: true }); setSelectedIds(new Set()); void loadMessages(); void loadAliases() } catch {} }} className="text-[10px] text-muted-foreground hover:text-foreground">Restore</button> : <button type="button" onClick={async () => { const ids = [...selectedIds]; try { await bulkUpdateMessages({ message_ids: ids, archived: true }); setSelectedIds(new Set()); void loadMessages(); void loadAliases() } catch {} }} className="text-[10px] text-muted-foreground hover:text-foreground">Archive</button>}
-              <button type="button" onClick={async () => { const ids = [...selectedIds]; try { await bulkUpdateMessages({ message_ids: ids, delete: true }); setSelectedIds(new Set()); void loadMessages(); void loadAliases() } catch {} }} className="text-[10px] text-destructive hover:text-destructive">Delete</button>
-            </div>
-          )}
-        </div>
-
-        {actionError && <p className="border-b border-border/40 px-4 py-2 text-[11px] text-destructive" role="alert">{actionError}</p>}
-
-        {/* ── Main: message list + detail panel ── */}
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          <ul className={cn("min-h-0 shrink-0 overflow-y-auto border-r border-border/40 transition-all duration-300", selected || composeOpen ? "w-[min(22rem,35%)]" : "w-full")}>
-            {messages.length === 0 ? (
-              <li className="flex flex-col items-center justify-center gap-2 px-6 py-20 text-center">
-                <Icon icon="ph:tray" className="size-5 text-muted-foreground/50" />
-                <p className="text-sm text-muted-foreground">{search ? "No matches" : "Nothing here"}</p>
-              </li>
-            ) : messages.map((message) => {
-              const unread = message.unread
-              const active = selectedId === message.id
-              const starred = Boolean(message.starred)
-              return (
-                <li key={message.id} className="group border-b border-border/30 last:border-b-0">
-                  <div className={cn("flex w-full items-start gap-2 px-2 text-left transition-colors", active ? "bg-secondary/40" : "hover:bg-secondary/20", listDensity === "compact" ? "py-2" : "py-3")}>
-                    <Checkbox checked={selectedIds.has(message.id)} onCheckedChange={() => toggleSelected(message.id)} className={cn("mt-2.5 opacity-0 transition-opacity group-hover:opacity-100", (selectedIds.has(message.id) || selectedIds.size > 0) && "opacity-100")} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} />
-                    <button type="button" onClick={() => openMessage(message)} className="flex min-w-0 flex-1 gap-3 pr-2 text-left">
-                      <SenderAvatar message={message} />
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-baseline justify-between gap-2">
-                          <span className={cn("truncate text-[13px]", unread ? "font-medium text-foreground" : "text-muted-foreground")}>
-                            {message.direction === "sent" ? `To: ${message.to ?? message.from}` : senderDisplayName(message.from, message.senderName)}
-                          </span>
-                          <span className="flex shrink-0 items-center gap-1.5">
-                            {starred && <Icon icon="ph:star-fill" className="size-2.5 text-accent" />}
-                            <span className="text-[10px] tabular-nums text-muted-foreground">{formatMessageListTime(message.receivedAt)}</span>
-                          </span>
-                        </span>
-                        <span className={cn("mt-0.5 block truncate text-[13px]", unread ? "text-foreground" : "text-muted-foreground/90")}>{message.subject}</span>
-                        <span className="mt-0.5 flex items-center gap-2">
-                          {message.deliveryStatus === "pending" && <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-px text-[9px] uppercase text-amber-600">Pending</span>}
-                          {message.deliveryStatus === "failed" && <span className="rounded-full border border-destructive/30 bg-destructive/10 px-1.5 py-px text-[9px] uppercase text-destructive">Failed</span>}
-                          {message.hasAttachments && <Icon icon="ph:paperclip" className="size-2.5 text-muted-foreground/50" />}
-                          <span className="block truncate text-[11px] text-muted-foreground/70">{message.preview}</span>
-                        </span>
-                      </span>
-                    </button>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-
-          {(!isWin32 || selected || composeOpen) && <div className="hidden min-h-0 min-w-0 flex-1 md:flex md:flex-col">
-            <AnimatePresence mode="wait">
-              {composeOpen ? (
-                <motion.div key="compose" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }} transition={{ duration: 0.22, ease }} className="flex min-h-0 flex-1 flex-col">
-                  <ComposePanel fromAddresses={sendableFrom} defaultFrom={selectedAlias ?? undefined} replyTo={replyTo} canSend={effectiveCanSend} canSendHtml={canSendHtml} canUseSecureLink={canUseSecureLink}
-                    onClose={() => { setComposeOpen(false); setReplyTo(null) }} onUpgrade={showUpgrade}
-                    onSent={(fromAlias) => { setCanSend(true); setComposeOpen(false); setReplyTo(null); setSelectedId(null); if (fromAlias) setSelectedAlias(fromAlias); setView("sent"); window.setTimeout(() => { void loadMessages().catch(() => {}) }, 4000) }} />
-                </motion.div>
-              ) : selected ? (
-                <motion.article key={selected.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease }} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-                  <div className="flex items-center gap-1 border-b border-border/40 px-4 py-2">
-                    <button type="button" title="Star" onClick={() => toggleStar(selected.id)} className={cn("inline-flex size-7 items-center justify-center rounded-full transition-colors", selected.starred ? "text-accent" : "text-muted-foreground hover:text-foreground")}><Icon icon={selected.starred ? "ph:star-fill" : "ph:star"} className="size-4" /></button>
-                    <button type="button" title="Archive" onClick={() => void archiveMessage(selected.id)} className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"><Icon icon="ph:archive" className="size-4" /></button>
-                    <button type="button" title="Delete" onClick={() => void deleteSelectedMessage(selected.id)} className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-destructive"><Icon icon="ph:trash" className="size-4" /></button>
-                    <div className="mx-0.5 h-3 w-px bg-border/40" />
-                    <button type="button" title="Reply" onClick={() => { setReplyTo(buildReplyContext(selected)); setComposeOpen(true) }} disabled={!effectiveCanSend} className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"><Icon icon="ph:arrow-bend-up-left" className="size-4" /></button>
-                    <button type="button" title="Forward" onClick={() => { setReplyTo(buildForwardContext(selected)); setComposeOpen(true) }} disabled={!effectiveCanSend} className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"><Icon icon="ph:arrow-bend-down-right" className="size-4" /></button>
-                    <div className="flex-1" />
-                    <button type="button" title="Block sender" onClick={() => void blockSelectedSender(selected.from)} className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"><Icon icon="ph:prohibit" className="size-4" /></button>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto px-5 py-4">
-                    <div className="flex items-start gap-3">
-                      <SenderAvatar message={selected} />
-                      <div className="min-w-0 flex-1">
-                        <h2 className="text-[15px] font-medium tracking-tight">{selected.subject}</h2>
-                        <p className="mt-1 text-[12px] text-muted-foreground">
-                          {senderDisplayName(selected.from, selected.senderName)} &lt;{selected.from}&gt;
-                          {selected.alias && <span className="ml-2 text-muted-foreground/60">to {selected.alias}</span>}
-                        </p>
-                        <p className="mt-0.5 text-[11px] text-muted-foreground/60">{formatWhen(selected.receivedAt)}</p>
-                      </div>
-                    </div>
-                    <MessageBody body={selected.body} bodyHtml={selected.bodyHtml} className="mt-4" />
-                    {selected.attachments && selected.attachments.length > 0 && (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {selected.attachments.map((att) => (
-                          <a key={att.id} href={`https://api.aeri.rest/api/v1/messages/${selected.id}/attachments/${att.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/60 px-3 py-1.5 text-[11px] text-muted-foreground transition-colors hover:border-accent/30 hover:text-foreground">
-                            <Icon icon="ph:paperclip" className="size-3" /> <span className="font-mono">{att.filename}</span>
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </motion.article>
-              ) : (
-                <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-1 items-center justify-center text-sm text-muted-foreground/60">Select a message</motion.div>
-              )}
-            </AnimatePresence>
-          </div>}
-        </div>
-
-        {/* ── Status bar ── */}
-        <footer className="flex shrink-0 items-center gap-3 border-t border-border/50 px-4 py-1.5">
-          <AeriLogo className="h-2.5 w-auto text-muted-foreground/50" />
-          <div className="h-2.5 w-px bg-border/40" />
-          <div className="flex items-center gap-1.5">
-            <span className={cn("size-1.5 rounded-full", realtimeReconnecting ? "bg-amber-500" : "bg-green-500")} />
-            <span className="text-[10px] text-muted-foreground">{realtimeReconnecting ? "Reconnecting…" : "Connected"}</span>
+      {/* ── Toolbar: filters + alias info + bulk actions ── */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-border/30 px-4 py-2">
+        <button type="button" onClick={() => setFilterUnread((c) => !c)} className={cn("rounded-full border px-2.5 py-0.5 text-[10px]", filterUnread ? "border-accent/40 bg-accent/10 text-accent" : "border-border/60 text-muted-foreground")}>Unread</button>
+        <button type="button" onClick={() => setFilterAttachments((c) => !c)} className={cn("rounded-full border px-2.5 py-0.5 text-[10px]", filterAttachments ? "border-accent/40 bg-accent/10 text-accent" : "border-border/60 text-muted-foreground")}>Attachments</button>
+        <div className="flex-1" />
+        {view === "inbox" && <button type="button" onClick={() => void markAllRead()} className="text-[10px] text-muted-foreground transition-colors hover:text-foreground">Mark all read</button>}
+        {view === "trash" && messages.length > 0 && <button type="button" onClick={async () => { try { await emptyTrash(); setMessages([]); setSelectedId(null); void loadAliases() } catch {} }} className="text-[10px] text-destructive transition-colors hover:text-destructive">Empty trash</button>}
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-muted-foreground">{selectedIds.size} selected</span>
+            <button type="button" onClick={async () => { const ids = [...selectedIds]; try { await bulkUpdateMessages({ message_ids: ids, read: true }); setSelectedIds(new Set()); void loadMessages(); void loadAliases() } catch {} }} className="text-[10px] text-muted-foreground hover:text-foreground">Mark read</button>
+            <button type="button" onClick={async () => { const ids = [...selectedIds]; try { await bulkUpdateMessages({ message_ids: ids, starred: true }); setSelectedIds(new Set()); void loadMessages(); void loadAliases() } catch {} }} className="text-[10px] text-muted-foreground hover:text-foreground">Star</button>
+            {view === "trash" ? <button type="button" onClick={async () => { const ids = [...selectedIds]; try { await bulkUpdateMessages({ message_ids: ids, restore: true }); setSelectedIds(new Set()); void loadMessages(); void loadAliases() } catch {} }} className="text-[10px] text-muted-foreground hover:text-foreground">Restore</button> : <button type="button" onClick={async () => { const ids = [...selectedIds]; try { await bulkUpdateMessages({ message_ids: ids, archived: true }); setSelectedIds(new Set()); void loadMessages(); void loadAliases() } catch {} }} className="text-[10px] text-muted-foreground hover:text-foreground">Archive</button>}
+            <button type="button" onClick={async () => { const ids = [...selectedIds]; try { await bulkUpdateMessages({ message_ids: ids, delete: true }); setSelectedIds(new Set()); void loadMessages(); void loadAliases() } catch {} }} className="text-[10px] text-destructive hover:text-destructive">Delete</button>
           </div>
-          <div className="h-2.5 w-px bg-border/40" />
-          <span className="text-[10px] text-muted-foreground">{aliases.length} alias{aliases.length !== 1 ? "es" : ""}</span>
-          {totalUnread > 0 && <><div className="h-2.5 w-px bg-border/40" /><span className="text-[10px] text-accent">{totalUnread} unread</span></>}
-          <div className="flex-1" />
-          <UpdateNotification />
-          {accountEmail && <span className="text-[10px] text-muted-foreground/60">{accountEmail}</span>}
-          <button
-            type="button"
-            onClick={() => setSecurityOpen(true)}
-            className="text-[10px] text-muted-foreground/40 transition-colors hover:text-muted-foreground/80 cursor-pointer"
-          >
-            Security
-          </button>
-          <button onClick={() => { localStorage.removeItem("aeri_session_token"); localStorage.removeItem("aerimail_account_code"); if (window.electronAPI?.forceSignIn) window.electronAPI.forceSignIn(); else window.location.href = "/sign-in" }} className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground/80 transition-colors cursor-pointer">Logout</button>
-          {plan !== "free" && <span className="rounded-full border border-accent/25 bg-accent/10 px-1.5 py-px text-[8px] uppercase tracking-wide text-accent">{plan}</span>}
-        </footer>
+        )}
       </div>
+
+      {actionError && <p className="border-b border-border/40 px-4 py-2 text-[11px] text-destructive" role="alert">{actionError}</p>}
+
+      {/* ── Main: message list + detail panel ── */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <ul className={cn("min-h-0 shrink-0 overflow-y-auto border-r border-border/40 transition-all duration-300", selected || composeOpen ? "w-[min(22rem,35%)]" : "w-full")}>
+          {messages.length === 0 ? (
+            <li className="flex flex-col items-center justify-center gap-2 px-6 py-20 text-center">
+              <Icon icon="ph:tray" className="size-5 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">{search ? "No matches" : "Nothing here"}</p>
+            </li>
+          ) : messages.map((message) => (
+            <MessageListItem
+              key={message.id}
+              message={message}
+              active={selectedId === message.id}
+              selected={selectedIds.has(message.id)}
+              showCheckbox={selectedIds.size > 0}
+              listDensity={listDensity}
+              onOpen={openMessage}
+              onToggleSelect={toggleSelected}
+            />
+          ))}
+        </ul>
+
+        {(!isWin32 || selected || composeOpen) && <div className="hidden min-h-0 min-w-0 flex-1 md:flex md:flex-col">
+          <AnimatePresence mode="wait">
+            {composeOpen ? (
+              <motion.div key="compose" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }} transition={{ duration: 0.22, ease }} className="flex min-h-0 flex-1 flex-col">
+                <ComposePanel fromAddresses={sendableFrom} defaultFrom={selectedAlias ?? undefined} replyTo={replyTo} canSend={effectiveCanSend} canSendHtml={canSendHtml} canUseSecureLink={canUseSecureLink}
+                  onClose={() => { setComposeOpen(false); setReplyTo(null) }} onUpgrade={showUpgrade}
+                  onSent={(fromAlias) => { setCanSend(true); setComposeOpen(false); setReplyTo(null); setSelectedId(null); if (fromAlias) setSelectedAlias(fromAlias); setView("sent"); window.setTimeout(() => { void loadMessages().catch(() => {}) }, 4000) }} />
+              </motion.div>
+            ) : selected ? (
+              <motion.article key={selected.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease }} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+                <div className="flex items-center gap-1 border-b border-border/40 px-4 py-2">
+                  <button type="button" title="Star" onClick={() => toggleStar(selected.id)} className={cn("inline-flex size-7 items-center justify-center rounded-full transition-colors", selected.starred ? "text-accent" : "text-muted-foreground hover:text-foreground")}><Icon icon={selected.starred ? "ph:star-fill" : "ph:star"} className="size-4" /></button>
+                  <button type="button" title="Archive" onClick={() => void archiveMessage(selected.id)} className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"><Icon icon="ph:archive" className="size-4" /></button>
+                  <button type="button" title="Delete" onClick={() => void deleteSelectedMessage(selected.id)} className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-destructive"><Icon icon="ph:trash" className="size-4" /></button>
+                  <div className="mx-0.5 h-3 w-px bg-border/40" />
+                  <button type="button" title="Reply" onClick={() => { setReplyTo(buildReplyContext(selected)); setComposeOpen(true) }} disabled={!effectiveCanSend} className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"><Icon icon="ph:arrow-bend-up-left" className="size-4" /></button>
+                  <button type="button" title="Forward" onClick={() => { setReplyTo(buildForwardContext(selected)); setComposeOpen(true) }} disabled={!effectiveCanSend} className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"><Icon icon="ph:arrow-bend-down-right" className="size-4" /></button>
+                  <div className="flex-1" />
+                  <button type="button" title="Block sender" onClick={() => void blockSelectedSender(selected.from)} className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"><Icon icon="ph:prohibit" className="size-4" /></button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto px-5 py-4">
+                  <div className="flex items-start gap-3">
+                    <SenderAvatar message={selected} />
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-[15px] font-medium tracking-tight">{selected.subject}</h2>
+                      <p className="mt-1 text-[12px] text-muted-foreground">
+                        {senderDisplayName(selected.from, selected.senderName)} &lt;{selected.from}&gt;
+                        {selected.alias && <span className="ml-2 text-muted-foreground/60">to {selected.alias}</span>}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground/60">{formatWhen(selected.receivedAt)}</p>
+                    </div>
+                  </div>
+                  <MessageBody body={selected.body} bodyHtml={selected.bodyHtml} className="mt-4" />
+                  {selected.attachments && selected.attachments.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {selected.attachments.map((att) => (
+                        <a key={att.id} href={`https://api.aeri.rest/api/v1/messages/${selected.id}/attachments/${att.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/60 px-3 py-1.5 text-[11px] text-muted-foreground transition-colors hover:border-accent/30 hover:text-foreground">
+                          <Icon icon="ph:paperclip" className="size-3" /> <span className="font-mono">{att.filename}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.article>
+            ) : (
+              <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-1 items-center justify-center text-sm text-muted-foreground/60">Select a message</motion.div>
+            )}
+          </AnimatePresence>
+        </div>}
+      </div>
+
+      <StatusFooter
+        realtimeReconnecting={realtimeReconnecting}
+        aliasesCount={aliases.length}
+        totalUnread={totalUnread}
+        accountEmail={accountEmail}
+        plan={plan}
+        onSecurity={() => setSecurityOpen(true)}
+        onLogout={handleLogout}
+      />
 
       <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} onUpgraded={() => { setCanSend(true); setUpgradeOpen(false) }} />
       <SecurityModal open={securityOpen} onClose={() => setSecurityOpen(false)} />
@@ -594,6 +742,6 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
       }} loading={Boolean(burningAliasId)} title="Burn alias?" description="Permanently destroy this alias. Senders will get a hard bounce." confirmLabel="Burn" variant="destructive" icon="ph:fire" highlight={burnAliasTarget?.handle} />
       <KeyboardShortcutsOverlay open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <SendToastHost />
-    </LayoutGroup>
+    </div>
   )
 }
