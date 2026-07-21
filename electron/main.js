@@ -4,7 +4,7 @@ const fs = require("fs")
 
 const isDev = !app.isPackaged
 const API_URL = process.env.API_URL || "https://api.aeri.rest"
-const GITHUB_REPO = process.env.GITHUB_REPO || "anomalyco/aeri"
+const GITHUB_REPO = process.env.GITHUB_REPO || "cwelmail/desktop"
 const NEXT_PORT = 3000
 
 if (!isDev) {
