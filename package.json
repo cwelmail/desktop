@@ -1,14 +1,17 @@
 {
   "name": "aeri-desktop",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "private": true,
   "description": "aeri — Anonymous, private email desktop client",
   "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
     "build:next": "next build",
-    "build:electron": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --arm64",
-    "build": "npm run build:next && npm run build:electron",
+    "build:electron:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --arm64",
+    "build:electron:win": "ELECTRON_BUILDER_NSIS_DIR=\"$HOME/Library/Caches/electron-builder/nsis-3.0.4.1/nsis-3.0.4.1-1mx3n\" electron-builder --win --x64",
+    "build:mac": "npm run build:next && npm run build:electron:mac",
+    "build:win": "npm run build:next && npm run build:electron:win",
+    "build": "npm run build:next && npm run build:electron:mac",
     "start": "next start",
     "generate-icon": "node scripts/generate-icon.mjs"
   },
@@ -92,6 +95,21 @@
           "path": "/Applications"
         }
       ]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "public/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "${productName}-${version}-Setup-${arch}.${ext}",
+      "deleteAppDataOnUninstall": false
     }
   }
 }

@@ -33,13 +33,14 @@ function trayIconPath(unread) {
 }
 
 function createTrayIcon(_badge) {
-  // Always use the black template mark — macOS tints it for the menu bar.
   const image = nativeImage.createFromPath(trayIconPath(false))
   if (image.isEmpty()) {
     console.error("[aeri] tray icon failed to load:", trayIconPath(false))
   }
   const sized = image.resize({ width: TRAY_ICON_SIZE, height: TRAY_ICON_SIZE })
-  sized.setTemplateImage(true)
+  if (process.platform === "darwin") {
+    sized.setTemplateImage(true)
+  }
   return sized
 }
 
@@ -108,7 +109,7 @@ function createTrayPanel() {
     },
   })
 
-  trayPanel.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  if (process.platform === "darwin") trayPanel.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
 
   if (isDev) {
     trayPanel.loadFile(path.join(__dirname, "tray.html"))
@@ -147,15 +148,13 @@ function focusMainWindow() {
 }
 
 function createMainWindow() {
-  mainWindow = new BrowserWindow({
+  const isMacOS = process.platform === "darwin"
+
+  const windowOptions = {
     width: 1120,
     height: 720,
     minWidth: 680,
     minHeight: 480,
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 14, y: 18 },
-    vibrancy: "under-window",
-    visualEffectState: "active",
     backgroundColor: "#09090b",
     show: false,
     webPreferences: {
@@ -165,7 +164,16 @@ function createMainWindow() {
       webSecurity: isDev,
       sandbox: false,
     },
-  })
+  }
+
+  if (isMacOS) {
+    windowOptions.titleBarStyle = "hiddenInset"
+    windowOptions.trafficLightPosition = { x: 14, y: 18 }
+    windowOptions.vibrancy = "under-window"
+    windowOptions.visualEffectState = "active"
+  }
+
+  mainWindow = new BrowserWindow(windowOptions)
 
   if (isDev) {
     mainWindow.loadURL(`http://localhost:${NEXT_PORT}`)
@@ -177,7 +185,7 @@ function createMainWindow() {
   mainWindow.once("ready-to-show", () => mainWindow.show())
 
   mainWindow.on("close", (event) => {
-    if (!isQuitting) {
+    if (!isQuitting && process.platform === "darwin") {
       event.preventDefault()
       mainWindow.hide()
     }
@@ -320,7 +328,8 @@ app.whenReady().then(() => {
     })
   }
 
-  setupMenu()
+  if (process.platform === "darwin") setupMenu()
+  else Menu.setApplicationMenu(null)
   createMainWindow()
 
   const icon = createTrayIcon(0)

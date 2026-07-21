@@ -119,11 +119,20 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
   const [accountEmail, setAccountEmail] = useState("")
   const [plan, setPlan] = useState("free")
   const [aliasDropdownOpen, setAliasDropdownOpen] = useState(false)
+  const [isWin32, setIsWin32] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const messagesLoadEpochRef = useRef(0)
   const aliasDropdownRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef(messages)
   messagesRef.current = messages
+
+  useEffect(() => {
+    try {
+      (window as any).electronAPI?.getPlatform().then((p: string) => {
+        setIsWin32(p === "win32")
+      })
+    } catch { /* ignore */ }
+  }, [])
 
   const loadAliases = useCallback(async () => {
     const data = await listAliases()
@@ -350,7 +359,7 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
       <div className="flex min-h-0 w-full flex-1 flex-col">
 
         {/* ── Header bar: alias dropdown + tabs + search + compose ── */}
-        <header className="flex h-[52px] shrink-0 items-center gap-2 border-b border-border/50 pl-[72px] pr-3">
+        <header className="flex h-[52px] shrink-0 items-center gap-2 border-b border-border/50 pl-[var(--header-left-pad,72px)] pr-3">
           <div ref={aliasDropdownRef} className="relative shrink-0">
             <button type="button" onClick={() => setAliasDropdownOpen(!aliasDropdownOpen)} className="flex items-center gap-1.5 rounded-lg px-2 py-2 text-[12px] transition-colors hover:bg-secondary/50">
               <span className="font-mono text-muted-foreground">{activeAliasLabel}</span>
@@ -477,7 +486,7 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
             })}
           </ul>
 
-          <div className="hidden min-h-0 min-w-0 flex-1 md:flex md:flex-col">
+          {(!isWin32 || selected || composeOpen) && <div className="hidden min-h-0 min-w-0 flex-1 md:flex md:flex-col">
             <AnimatePresence mode="wait">
               {composeOpen ? (
                 <motion.div key="compose" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }} transition={{ duration: 0.22, ease }} className="flex min-h-0 flex-1 flex-col">
@@ -526,7 +535,7 @@ export function DesktopInbox({ primaryAlias, domain }: InboxProps) {
                 <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-1 items-center justify-center text-sm text-muted-foreground/60">Select a message</motion.div>
               )}
             </AnimatePresence>
-          </div>
+          </div>}
         </div>
 
         {/* ── Status bar ── */}
