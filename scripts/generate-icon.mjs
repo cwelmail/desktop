@@ -3,6 +3,7 @@
 import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { createRequire } from "node:module"
+import { spawnSync } from "node:child_process"
 
 const require = createRequire(import.meta.url)
 const PUBLIC = join(import.meta.dirname, "..", "public")
@@ -59,3 +60,7 @@ renderPng(iconSvg, join(PUBLIC, "icon.png"), 512)
 // Menu bar: Electron needs real PNGs — SVG buffers render as empty images.
 renderPng(traySvg(44, "#000000"), join(ELECTRON, "trayTemplate.png"), 44)
 renderPng(traySvg(44, "#22C55E"), join(ELECTRON, "trayUnread.png"), 44)
+
+const dmgGen = join(import.meta.dirname, "generate-dmg-background.mjs")
+const dmg = spawnSync(process.execPath, [dmgGen], { stdio: "inherit" })
+if (dmg.status) process.exit(dmg.status)
